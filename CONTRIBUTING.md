@@ -1,4 +1,4 @@
-# Commit Guidelines for Spectra
+# Commit Guidelines for Hades
 
 To ensure clarity and traceability across all of Spectra — including modules like Blaze, Iota, Stratum, and Kerbecs — we follow a file-scoped commit format. This focuses on which files or systems are affected (in the title), and why the change was made (in the body), with clean and consistent tagging.
 
