@@ -3,7 +3,6 @@ project(Hades LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB_RECURSE Hades_HEADERS  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/Public/*.h")
 file(GLOB_RECURSE Hades_SOURCE   CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/Private/*.cpp")
@@ -17,9 +16,8 @@ add_library(Hades SHARED
     ${Hades_SOURCE}
     ${Hades_INL}
 )
-target_compile_definitions(Hades PRIVATE Hades_EXPORTS)
 
-target_include_directories(Hades PRIVATE
+target_include_directories(Hades PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Public
 )
 

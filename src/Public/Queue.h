@@ -43,7 +43,7 @@ namespace Hades::Runtime::Queues {
 	public:
 		ChaseLevDeque() noexcept
 			: m_bottom(0)
-			, m_top(0) {
+			, m_top(0), m_buffer{} {
 		}
 
 		~ChaseLevDeque() = default;

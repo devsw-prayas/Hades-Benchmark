@@ -25,9 +25,9 @@
 * SOFTWARE.
 */
 #pragma once
+#include "HadesCompiler.h"
 
 #if defined(HADES_SHARED)
-
 #if HADES_COMPILER_MSVC
 #if defined(HADES_BUILDING_RUNTIME)
 #define HADES_RUNTIME_API __declspec(dllexport)
@@ -42,7 +42,7 @@
 
 #else
 // Static build -> no import/export
-#define HADES_RUNTIME_API
+#define HADES_RUNTIME_API __declspec(dllexport)
 #endif
 
 #include <cstdint>

@@ -433,8 +433,8 @@ namespace Hades::Runtime {
         // Dummy event placeholders - concrete adapter types provide real events
         // These are placeholder typed as int; actual event type is adapter_-defined
         // and accessed via recordEvent<E>() template. Adapter owns real events.
-        int m_startEvents[MAX_THREADS] = {};
-        int m_endEvents[MAX_THREADS] = {};
+        typename adapter_::event_type m_startEvents[MAX_THREADS] = {};
+        typename adapter_::event_type m_endEvents[MAX_THREADS] = {};
 
         // Thread pool
         std::thread m_threads[MAX_THREADS];

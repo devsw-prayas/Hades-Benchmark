@@ -29,56 +29,58 @@
 #include "HadesCompiler.h"
 
 namespace Hades::Runtime {
-    enum class HADES_RUNTIME_API ChronoBackend : uint8_t {
-        Rdtsc,         // RdtscChronoPoint    - lowest overhead, rdtsc/rdtscp
-        SteadyClock,   // SteadyClockChronoPoint - portable, frequency-scaling immune
-    };
-	
-	struct HADES_RUNTIME_API Config final{
-        uint32_t      m_ThreadCount = 0;    // 0 = hardware_concurrency
-        uint64_t      m_Iterations = 0;   // 0 = calibration-derived
-        ChronoBackend m_ChronoBackend = ChronoBackend::SteadyClock;
+	enum class HADES_RUNTIME_API ChronoBackend : uint8_t {
+		Rdtsc,         // RdtscChronoPoint    - lowest overhead, rdtsc/rdtscp
+		SteadyClock,   // SteadyClockChronoPoint - portable, frequency-scaling immune
+	};
 
-        uint32_t m_WarmupCount = 0;   // user-provided; not calibration-derived
+	struct HADES_RUNTIME_API Config final {
+		uint32_t      m_ThreadCount = 0;    // 0 = hardware_concurrency
+		uint64_t      m_Iterations = 0;   // 0 = calibration-derived
+		ChronoBackend m_ChronoBackend = ChronoBackend::SteadyClock;
 
-        double   m_CvThreshold = 0.0;   // coefficient of variation target
-        uint32_t m_MinSlices = 0;     // minimum slice floor before stopping
-        uint32_t m_MaxSlices = 0;     // hard slice cap regardless of CV
-        uint32_t m_ConsecutiveDiscardCap = 0;     // consecutive jitter-contaminated slice limit
-        uint32_t m_TotalDiscardCap = 0;     // total jitter-contaminated slice limit
-    };
+		uint32_t m_WarmupCount = 0;   // user-provided; not calibration-derived
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setThreadCount(Config& ro_Config, uint32_t v_Count = 0) {
-        ro_Config.m_ThreadCount = v_Count;
-    }
+		double   m_CvThreshold = 0.0;   // coefficient of variation target
+		uint32_t m_MinSlices = 0;     // minimum slice floor before stopping
+		uint32_t m_MaxSlices = 0;     // hard slice cap regardless of CV
+		uint32_t m_ConsecutiveDiscardCap = 0;     // consecutive jitter-contaminated slice limit
+		uint32_t m_TotalDiscardCap = 0;     // total jitter-contaminated slice limit
+	};
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setIterations(Config& ro_Config, uint64_t v_Count = 0) {
-        ro_Config.m_Iterations = v_Count;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setThreadCount(Config& ro_Config, uint32_t v_Count = 0) {
+		ro_Config.m_ThreadCount = v_Count;
+	}
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setChronoBackend(Config& ro_Config, ChronoBackend v_Backend) {
-        ro_Config.m_ChronoBackend = v_Backend;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setIterations(Config& ro_Config, uint64_t v_Count = 0) {
+		ro_Config.m_Iterations = v_Count;
+	}
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setCvThreshold(Config& ro_Config, double v_Threshold) {
-        ro_Config.m_CvThreshold = v_Threshold;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setChronoBackend(Config& ro_Config, ChronoBackend v_Backend) {
+		ro_Config.m_ChronoBackend = v_Backend;
+	}
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setMinSlices(Config& ro_Config, uint32_t v_Slices) {
-        ro_Config.m_MinSlices = v_Slices;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setCvThreshold(Config& ro_Config, double v_Threshold) {
+		ro_Config.m_CvThreshold = v_Threshold;
+	}
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setMaxSlices(Config& ro_Config, uint32_t v_Slices) {
-        ro_Config.m_MaxSlices = v_Slices;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setMinSlices(Config& ro_Config, uint32_t v_Slices) {
+		ro_Config.m_MinSlices = v_Slices;
+	}
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setConsecutiveDiscards(Config& ro_Config, uint32_t v_Discards) {
-        ro_Config.m_ConsecutiveDiscardCap = v_Discards;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setMaxSlices(Config& ro_Config, uint32_t v_Slices) {
+		ro_Config.m_MaxSlices = v_Slices;
+	}
 
-    HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setTotalDiscards(Config& ro_Config, uint32_t v_Discards) {
-        ro_Config.m_TotalDiscardCap = v_Discards;
-    }
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setConsecutiveDiscards(Config& ro_Config, uint32_t v_Discards) {
+		ro_Config.m_ConsecutiveDiscardCap = v_Discards;
+	}
 
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setTotalDiscards(Config& ro_Config, uint32_t v_Discards) {
+		ro_Config.m_TotalDiscardCap = v_Discards;
+	}
 
+	HADES_FORCEINLINE HADES_RUNTIME_API constexpr void setWarmup(Config& ro_Config, uint32_t v_Count) {
+		ro_Config.m_WarmupCount = v_Count;
+	}
 } // namespace Hades

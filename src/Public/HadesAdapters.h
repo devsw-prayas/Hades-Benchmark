@@ -39,9 +39,9 @@ namespace Hades::Runtime {
     };
 
     class HADES_RUNTIME_API NullDeviceAdapter final
-        : public IDeviceAdapter<NullDeviceAdapter>
-    {
+        : public IDeviceAdapter<NullDeviceAdapter>{
     public:
+        using event_type = CpuEvent;
         NullDeviceAdapter() = default;
         ~NullDeviceAdapter() = default;
 
