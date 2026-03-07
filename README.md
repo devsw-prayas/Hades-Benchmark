@@ -188,4 +188,4 @@ MIT. See license header in any source file.
 
 ---
 
-> Hades is part of the [Spectra](https://github.com/StormWeaver) ecosystem.
+> Hades is part of the [Spectra](https://github.com/devsw-prayas/Spectra) ecosystem.
