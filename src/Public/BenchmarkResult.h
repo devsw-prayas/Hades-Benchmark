@@ -26,7 +26,7 @@
 */
 #pragma once
 #include <Hades.h>
-#include "HadesDiagnositcs.h"
+#include "HadesDiagnostics.h"
 
 namespace Hades::Runtime {
 

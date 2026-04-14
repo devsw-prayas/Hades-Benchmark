@@ -28,7 +28,7 @@
 
 #include <Hades.h>
 #include <HadesCompiler.h>
-#include <HadesDiagnositcs.h>
+#include <HadesDiagnostics.h>
 
 #include "Chrono.h"
 
@@ -49,9 +49,7 @@ namespace Hades::Runtime::Chrono {
 	class HADES_RUNTIME_API RdtscChronoPoint final
 		: public IChronoPoint<RdtscChronoPoint> {
 	public:
-		RdtscChronoPoint() noexcept
-			: m_nsPerTick(internalCalibrate()) {
-		}
+		RdtscChronoPoint() noexcept;
 
 		~RdtscChronoPoint() = default;
 
@@ -68,9 +66,10 @@ namespace Hades::Runtime::Chrono {
 
 	private:
 		// Calibrates nanoseconds-per-tick by measuring a known chrono interval.
-		// Called once at construction - not in any hot path.
+		// Called exactly once across the engine lifetime.
 		static double internalCalibrate() noexcept;
-		double m_nsPerTick;   // nanoseconds per TSC tick, calibrated at construction
+
+		static double s_nsPerTick;   // Shared nanoseconds per TSC tick
 	};
 
 	struct SteadyTimestamp {

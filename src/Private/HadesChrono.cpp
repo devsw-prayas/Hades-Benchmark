@@ -1,7 +1,17 @@
 #include <Hades.h>
 #include <HadesChrono.h>
 
-namespace Hades::Runtime {
+	#include <mutex>
+
+	double Chrono::RdtscChronoPoint::s_nsPerTick = 0.0;
+
+	Chrono::RdtscChronoPoint::RdtscChronoPoint() noexcept {
+		static std::once_flag once;
+		std::call_once(once, []() {
+			s_nsPerTick = internalCalibrate();
+		});
+	}
+
 	Chrono::SteadyTimestamp Chrono::SteadyClockChronoPoint::nowImpl() noexcept {
 		return SteadyTimestamp{ std::chrono::steady_clock::now() };
 	}
@@ -17,9 +27,9 @@ namespace Hades::Runtime {
 		return RdtscTimestamp{ __rdtsc() };
 	}
 
-	HADES_FORCEINLINE uint64_t Chrono::RdtscChronoPoint::deltaImpl(RdtscTimestamp v_Begin, RdtscTimestamp v_End) const noexcept {
+	uint64_t Chrono::RdtscChronoPoint::deltaImpl(RdtscTimestamp v_Begin, RdtscTimestamp v_End) const noexcept {
 		const uint64_t ticks = v_End.ticks - v_Begin.ticks;
-		return static_cast<uint64_t>(static_cast<double>(ticks) * m_nsPerTick);
+		return static_cast<uint64_t>(static_cast<double>(ticks) * s_nsPerTick);
 	}
 
 	double Chrono::RdtscChronoPoint::internalCalibrate() noexcept {

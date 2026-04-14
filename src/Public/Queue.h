@@ -28,7 +28,7 @@
 
 #include <Hades.h>
 #include <HadesCompiler.h>
-#include <HadesDiagnositcs.h>
+#include <HadesDiagnostics.h>
 
 namespace Hades::Runtime::Queues {
 	template<typename T, uint32_t Capacity>

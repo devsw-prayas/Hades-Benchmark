@@ -28,7 +28,7 @@
 
 #include <Hades.h>
 #include <HadesCompiler.h>
-#include <HadesDiagnositcs.h>
+#include <HadesDiagnostics.h>
 
 #include "Configuration.h"
 #include "BenchmarkResult.h"

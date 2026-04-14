@@ -28,7 +28,7 @@
 
 #include <Hades.h>
 #include <HadesCompiler.h>
-#include <HadesDiagnositcs.h>
+#include <HadesDiagnostics.h>
 
 #include "Barrier.h"
 #include "Queue.h"
@@ -38,6 +38,7 @@
 #include "BenchmarkResult.h"
 #include "HadesHash.h"
 #include "Validator.h"
+#include "HadesChrono.h"
 #include "StatsAccumulator.h"
 
 namespace Hades::Runtime {
@@ -324,8 +325,15 @@ namespace Hades::Runtime {
                 const uint64_t iters = job.iterationsPerChunk;
 
                 // Record start
-                m_perThreadStartTimes[v_ThreadIndex] =
-                    static_cast<double>(internalCurrentTimeNs()) * 1e-9;
+                uint64_t startNs = 0;
+                Chrono::SteadyTimestamp steadyStart;
+                Chrono::RdtscTimestamp rdtscStart;
+
+                if (m_config.m_ChronoBackend == ChronoBackend::Rdtsc) {
+                    rdtscStart = m_clockRdtsc.now();
+                } else {
+                    steadyStart = m_clockSteady.now();
+                }
 
                 ro_Adapter.recordEvent(m_startEvents[v_ThreadIndex]);
 
@@ -336,10 +344,14 @@ namespace Hades::Runtime {
                 ro_Adapter.recordEvent(m_endEvents[v_ThreadIndex]);
                 ro_Adapter.synchronize();
 
-                const double endTime =
-                    static_cast<double>(internalCurrentTimeNs()) * 1e-9;
+                if (m_config.m_ChronoBackend == ChronoBackend::Rdtsc) {
+                    const auto rdtscEnd = m_clockRdtsc.now();
+                    m_perThreadTimes[v_ThreadIndex] = static_cast<double>(m_clockRdtsc.delta(rdtscStart, rdtscEnd)) * 1e-9;
+                } else {
+                    const auto steadyEnd = m_clockSteady.now();
+                    m_perThreadTimes[v_ThreadIndex] = static_cast<double>(m_clockSteady.delta(steadyStart, steadyEnd)) * 1e-9;
+                }
 
-                m_perThreadTimes[v_ThreadIndex] = endTime - m_perThreadStartTimes[v_ThreadIndex];
                 m_perThreadKernelTimes[v_ThreadIndex] = static_cast<double>(
                     ro_Adapter.elapsedTime(m_startEvents[v_ThreadIndex], m_endEvents[v_ThreadIndex])) * 1e-3;
                 m_perThreadDriverOverhead[v_ThreadIndex] =
@@ -391,11 +403,6 @@ namespace Hades::Runtime {
             }
         }
 
-        // Portable monotonic timestamp in nanoseconds
-        static uint64_t internalCurrentTimeNs() noexcept {
-            return static_cast<uint64_t>(
-                std::chrono::steady_clock::now().time_since_epoch().count());
-        }
 
         uint32_t           m_threadCount;
         uint32_t           m_activeBarrierSize = 0;
@@ -419,7 +426,6 @@ namespace Hades::Runtime {
         void* m_adapterSlots[MAX_THREADS] = {};
 
         // Per-thread timing scratch
-        double m_perThreadStartTimes[MAX_THREADS] = {};
         double m_perThreadTimes[MAX_THREADS] = {};
         double m_perThreadKernelTimes[MAX_THREADS] = {};
         double m_perThreadDriverOverhead[MAX_THREADS] = {};
@@ -435,6 +441,10 @@ namespace Hades::Runtime {
         // and accessed via recordEvent<E>() template. Adapter owns real events.
         typename adapter_::event_type m_startEvents[MAX_THREADS] = {};
         typename adapter_::event_type m_endEvents[MAX_THREADS] = {};
+
+        // Chrono backends
+        Chrono::SteadyClockChronoPoint m_clockSteady;
+        Chrono::RdtscChronoPoint       m_clockRdtsc;
 
         // Thread pool
         std::thread m_threads[MAX_THREADS];
