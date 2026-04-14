@@ -51,10 +51,9 @@ namespace Hades::Runtime {
         uint32_t chunkIndex;          // which chunk this job represents (0-based)
     };
 
-    template<typename F, typename A, typename H>
+    template<typename A, typename H>
     class ThreadRuntime final
     {
-        using fixture_ = F;
         using adapter_ = A;
         using accumulator_ = H;
 
@@ -84,17 +83,17 @@ namespace Hades::Runtime {
 
         // Executes a full benchmark run for a single-threaded submit.
         // One thread steals the job; all others remain idle on the barrier.
-        void submit(const Config& ro_Config) noexcept {
-            internalRunLifecycle(ro_Config, 1);
+        void submit(const Config& ro_Config, const FixtureFactory& ro_Factory) noexcept {
+            internalRunLifecycle(ro_Config, ro_Factory, 1);
         }
 
         // Executes a full benchmark run with parallel fan-out.
         // v_ChunkCount chunks pushed; barrier size = min(v_ChunkCount, m_threadCount).
-        void submitParallel(const Config& ro_Config, uint32_t v_ChunkCount) noexcept {
+        void submitParallel(const Config& ro_Config, const FixtureFactory& ro_Factory, uint32_t v_ChunkCount) noexcept {
             HADES_ASSERT(v_ChunkCount > 0);
             const uint32_t barrierSize = (v_ChunkCount < m_threadCount)
                 ? v_ChunkCount : m_threadCount;
-            internalRunLifecycle(ro_Config, barrierSize);
+            internalRunLifecycle(ro_Config, ro_Factory, barrierSize);
         }
 
 
@@ -144,9 +143,10 @@ namespace Hades::Runtime {
         }
 
 
-        void internalRunLifecycle(const Config& ro_Config, uint32_t v_BarrierSize) noexcept {
+        void internalRunLifecycle(const Config& ro_Config, const FixtureFactory& ro_Factory, uint32_t v_BarrierSize) noexcept {
             m_activeBarrierSize = v_BarrierSize;
             m_config = ro_Config;
+            m_currentFactory = ro_Factory;
 
             // Signal threads to start this run
             m_jobsReady.store(true, std::memory_order_release);
@@ -254,12 +254,8 @@ namespace Hades::Runtime {
         }
 
         void internalWorkerLoop(uint32_t v_ThreadIndex) noexcept {
-            // Each thread constructs its own adapter and fixture at launch
+            // Each thread constructs its own adapter at launch
             adapter_  adapter;
-            fixture_  fixture(adapter);
-
-            // Register this thread's fixture pointer for the coordinator
-            m_fixtureSlots[v_ThreadIndex] = static_cast<void*>(&fixture);
             m_adapterSlots[v_ThreadIndex] = static_cast<void*>(&adapter);
 
             // Wait until all threads have registered their slots
@@ -273,29 +269,37 @@ namespace Hades::Runtime {
                 if (HADES_UNLIKELY(m_shutdown.load(std::memory_order_acquire)))
                     return;
 
+                // Create fixture for this run
+                void* p_Fixture = m_currentFactory.create(m_adapterSlots[v_ThreadIndex]);
+                m_fixtureSlots[v_ThreadIndex] = p_Fixture;
+
                 // --- startup phase ---
-                fixture.startup();
+                m_currentFactory.startup(p_Fixture);
                 std::atomic_thread_fence(std::memory_order_seq_cst);
 
                 // --- warmup phase ---
                 const uint32_t warmupCount = m_config.m_WarmupCount;
                 for (uint32_t w = 0; w < warmupCount; ++w) {
-                    fixture.execute();
+                    m_currentFactory.execute(p_Fixture);
                     adapter.synchronize();
                 }
 
                 // --- slice loop ---
-                internalSliceLoop(v_ThreadIndex, fixture, adapter);
+                internalSliceLoop(v_ThreadIndex, p_Fixture, adapter);
 
                 // --- teardown phase ---
                 std::atomic_thread_fence(std::memory_order_seq_cst);
-                fixture.teardown();
+                m_currentFactory.teardown(p_Fixture);
+
+                // Cleanup fixture
+                m_currentFactory.destroy(p_Fixture);
+                m_fixtureSlots[v_ThreadIndex] = nullptr;
             }
         }
 
         void internalSliceLoop(
             uint32_t v_ThreadIndex,
-            fixture_& ro_Fixture,
+            void* p_Fixture,
             adapter_& ro_Adapter) noexcept {
             while (true) {
                 // Try to steal a job
@@ -325,7 +329,6 @@ namespace Hades::Runtime {
                 const uint64_t iters = job.iterationsPerChunk;
 
                 // Record start
-                uint64_t startNs = 0;
                 Chrono::SteadyTimestamp steadyStart;
                 Chrono::RdtscTimestamp rdtscStart;
 
@@ -338,7 +341,7 @@ namespace Hades::Runtime {
                 ro_Adapter.recordEvent(m_startEvents[v_ThreadIndex]);
 
                 for (uint64_t i = 0; i < iters; ++i) {
-                    ro_Fixture.execute();
+                    m_currentFactory.execute(p_Fixture);
                 }
 
                 ro_Adapter.recordEvent(m_endEvents[v_ThreadIndex]);
@@ -358,7 +361,7 @@ namespace Hades::Runtime {
                     m_perThreadTimes[v_ThreadIndex] - m_perThreadKernelTimes[v_ThreadIndex];
 
                 // reset between iterations
-                ro_Fixture.reset(ro_Adapter);
+                m_currentFactory.reset(p_Fixture, &ro_Adapter);
                 ro_Adapter.synchronize();
 
                 // --- BARRIER 1 - iteration completion ---
@@ -371,8 +374,7 @@ namespace Hades::Runtime {
 
                     // Collect per-thread hashes
                     for (uint32_t t = 0; t < m_threadCount; ++t) {
-                        auto* p_Fixture = static_cast<fixture_*>(m_fixtureSlots[t]);
-                        m_perThreadHashes[t] = p_Fixture->getDeterminismHash();
+                        m_perThreadHashes[t] = m_currentFactory.hash(m_fixtureSlots[t]);
                     }
 
                     // Aggregate slice timings
@@ -420,6 +422,9 @@ namespace Hades::Runtime {
 
         // Chase-Lev deque - jobs pushed by coordinator, stolen by workers
         Queues::ChaseLevDeque<ThreadJob, DEQUE_CAPACITY> m_deque;
+
+        // Current run context
+        FixtureFactory m_currentFactory = {};
 
         // Per-thread slots - registered at thread launch, read by coordinator
         void* m_fixtureSlots[MAX_THREADS] = {};

@@ -2,6 +2,7 @@
 #include <HadesChrono.h>
 
 	#include <mutex>
+namespace Hades::Runtime {
 
 	double Chrono::RdtscChronoPoint::s_nsPerTick = 0.0;
 

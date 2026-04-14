@@ -57,3 +57,63 @@
 #include <functional>
 #include <cstring>
 #include <cmath>
+#include <cstdio>
+
+namespace Hades::Runtime {
+
+	/**
+	 * @brief Type-blind factory for managing IFixture lifecycle within ThreadRuntime.
+	 * Erasure allows HadesEngine to execute arbitrary fixture types.
+	 */
+	struct FixtureFactory {
+		using CreateFn   = void*    (*)(void* p_Adapter);
+		using DestroyFn  = void     (*)(void* p_Fixture);
+		using StartupFn  = void     (*)(void* p_Fixture);
+		using ExecuteFn  = void     (*)(void* p_Fixture);
+		using ResetFn    = void     (*)(void* p_Fixture, void* p_Adapter);
+		using TeardownFn = void     (*)(void* p_Fixture);
+		using HashFn     = uint64_t (*)(void* p_Fixture);
+
+		CreateFn   create   = nullptr;
+		DestroyFn  destroy  = nullptr;
+		StartupFn  startup  = nullptr;
+		ExecuteFn  execute  = nullptr;
+		ResetFn    reset    = nullptr;
+		TeardownFn teardown = nullptr;
+		HashFn     hash     = nullptr;
+
+		HADES_NODISCARD constexpr bool isValid() const noexcept {
+			return create && destroy && execute;
+		}
+	};
+
+	/**
+	 * @brief Generates a type-erased Factory for a concrete Fixture/Adapter pair.
+	 */
+	template<typename F, typename A>
+	static HADES_NODISCARD FixtureFactory makeFactory() noexcept {
+		FixtureFactory f;
+		f.create   = [](void* a) -> void* {
+			return new F(*static_cast<A*>(a));
+		};
+		f.destroy  = [](void* p) {
+			delete static_cast<F*>(p);
+		};
+		f.startup  = [](void* p) {
+			static_cast<F*>(p)->startup();
+		};
+		f.execute  = [](void* p) {
+			static_cast<F*>(p)->execute();
+		};
+		f.reset    = [](void* p, void* a) {
+			static_cast<F*>(p)->reset(*static_cast<A*>(a));
+		};
+		f.teardown = [](void* p) {
+			static_cast<F*>(p)->teardown();
+		};
+		f.hash     = [](void* p) -> uint64_t {
+			return static_cast<F*>(p)->getDeterminismHash();
+		};
+		return f;
+	}
+}

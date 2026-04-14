@@ -44,23 +44,22 @@
 namespace Hades::Runtime {
 	struct RunRequest
 	{
-		void* p_Fixture = nullptr;   // non-owning, type-erased IFixture<D,A>*
-		Config config = {};
+		FixtureFactory factory = {};   // type-erased lifecycle hooks
+		Config         config  = {};
 	};
 
 #ifndef  HADES_ENGINE_QUEUE_CAPACITY
 #define HADES_ENGINE_QUEUE_CAPACITY 64
 #endif
 
-	template<typename F, typename A, typename H, typename S>
+	template<typename A, typename H, typename S>
 	class HadesEngine final
 	{
-		using fixture_ = F;
 		using adapter_ = A;
 		using accumulator_ = H;
 		using backend_ = S;
 
-		using runtime_ = ThreadRuntime<fixture_, adapter_, accumulator_>;
+		using runtime_ = ThreadRuntime<adapter_, accumulator_>;
 		using queue_ = Queues::SpscQueue<RunRequest, HADES_ENGINE_QUEUE_CAPACITY>;
 
 	public:
@@ -86,11 +85,11 @@ namespace Hades::Runtime {
 		// p_Fixture must remain valid until the engine completes the run.
 		// Returns false if the queue is full - caller must retry.
 		HADES_NODISCARD_MSG("Cannot discard submit result - queue may be full")
-			bool submit(void* p_Fixture, const Config& ro_Config) noexcept {
-			HADES_ASSERT(p_Fixture != nullptr);
+			bool submit(const FixtureFactory& ro_Factory, const Config& ro_Config) noexcept {
+			HADES_ASSERT(ro_Factory.isValid());
 
 			RunRequest req;
-			req.p_Fixture = p_Fixture;
+			req.factory = ro_Factory;
 			req.config = ro_Config;
 
 			return m_queue.push(req);
@@ -140,14 +139,12 @@ namespace Hades::Runtime {
 	private:
 
 		void internalExecuteRun(const RunRequest& ro_Req) noexcept {
-			HADES_ASSERT(ro_Req.p_Fixture != nullptr);
-
 			const uint32_t chunkCount = internalResolveChunkCount(ro_Req.config);
 
 			if (chunkCount <= 1)
-				m_runtime.submit(ro_Req.config);
+				m_runtime.submit(ro_Req.config, ro_Req.factory);
 			else
-				m_runtime.submitParallel(ro_Req.config, chunkCount);
+				m_runtime.submitParallel(ro_Req.config, ro_Req.factory, chunkCount);
 
 			// Collect result and forward to storage backend
 			const BenchmarkResult& r_Result = m_runtime.result();
