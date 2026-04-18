@@ -1,4 +1,4 @@
-# Spectra Code Style Guide
+# Hades Code Style Guide
 
 ## Motivation
 Certain layout and formatting rules are recommended to keep the code readable, predictable, and to make peace with my Java-flavored instincts.
@@ -28,7 +28,7 @@ auto square = [](int x) { return x * x; };
 if (is_valid) count++; log("Updated"); // Chaos awaits.
 
 // Good: Braced class with K&R style
-class SpectraThing {
+class HadesThing {
     void do_work() { process(); finalize(); }
 };
 ```
@@ -53,16 +53,16 @@ void process_data_really_long_function_name_to_make_a_point_about_column_limits(
 
 ### Code Example
 ```
-// Public/SpectraThing.h
+// Public/HadesThing.h
 #pragma once
-class SpectraThing {
+class HadesThing {
 public:
     void do_work();
 };
 
-// Private/SpectraThing.cpp
-#include "SpectraThing.h"
-void SpectraThing::do_work() {
+// Private/HadesThing.cpp
+#include "HadesThing.h"
+void HadesThing::do_work() {
     // Implementation lives here, not in the header!
 }
 ```
@@ -122,7 +122,7 @@ class Renderer { /* Depends on RenderContext */ };
 
 ### Code Example
 ```cpp
-class SpectraProcessor {
+class HadesProcessor {
 private:
     int data_;
     double config_;
@@ -151,13 +151,13 @@ struct AlignedData {
 
 ### Code Example
 ```
-// SpectraCorePCH.h
+// HadesCorePCH.h
 #pragma once
 #include <vector>
 #include <string>
 #define SPECTRA_LOG "LogPrefix"
 
-// SpectraThing.cpp
-#include "SpectraCorePCH.h"
+// HadesThing.cpp
+#include "HadesCorePCH.h"
 // No forward declarations, no mess
 ```

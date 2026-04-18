@@ -1,7 +1,7 @@
 /*
 * Copyright (c) 2026 StormWeaver
 *
-* This file is part of Hades Benchmark
+* This file is part of the Hades Benchmarking API
 *
 * Licensed under the MIT License. You may obtain a copy of the License at
 * https://opensource.org/licenses/MIT
@@ -16,13 +16,7 @@
 * The above copyright notice and this permission notice shall be included in all
 * copies or substantial portions of the Software.
 *
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
 #pragma once
 
@@ -31,7 +25,6 @@
 #include <HadesDiagnostics.h>
 
 #include "Barrier.h"
-#include "Queue.h"
 #include "Configuration.h"
 #include "Fixture.h"
 #include "Adapter.h"
@@ -42,13 +35,14 @@
 #include "StatsAccumulator.h"
 
 namespace Hades::Runtime {
-    static constexpr uint32_t DEQUE_CAPACITY = 256;
 
-    struct ThreadJob
-    {
-        void* p_Fixture;           // non-owning, type-erased IFixture<D,A>* - cast by worker
-        uint64_t iterationsPerChunk;  // number of execute() calls this job performs
-        uint32_t chunkIndex;          // which chunk this job represents (0-based)
+    /**
+     * @brief Internal tracking struct for a single work chunk within a slice.
+     */
+    struct ThreadJob {
+        void*    p_Fixture;
+        uint32_t chunkIndex;
+        uint64_t iterationsPerChunk;
     };
 
     template<typename A, typename H>
@@ -65,7 +59,10 @@ namespace Hades::Runtime {
             : m_threadCount(internalResolveThreadCount(v_ThreadCount))
             , m_shutdown(false)
             , m_jobsReady(false)
-            , m_sliceComplete(false) {
+            , m_sliceComplete(false)
+            , m_runStop(false)
+            , m_sliceEpoch(0)
+            , m_iterationsPerChunk(0) {
             HADES_ASSERT(m_threadCount > 0);
             HADES_ASSERT(m_threadCount <= MAX_THREADS);
 
@@ -118,9 +115,10 @@ namespace Hades::Runtime {
         }
 
         void internalSpawnThreads() noexcept {
-            // Dispatch barrier: all threads wait here between runs
-            m_dispatchBarrier.reset(m_threadCount);
-
+            // Both barriers reset once here, before any worker can call arrive()
+            m_dispatchBarrier.reset(m_threadCount + 1);
+            m_setupBarrier.reset(m_threadCount);
+            m_runCompletionBarrier.reset(m_threadCount + 1);
             for (uint32_t i = 0; i < m_threadCount; ++i) {
                 m_threads[i] = std::thread([this, i]() noexcept {
                     internalWorkerLoop(i);
@@ -130,11 +128,11 @@ namespace Hades::Runtime {
 
         void internalShutdown() noexcept {
             m_shutdown.store(true, std::memory_order_release);
+            m_runStop.store(true, std::memory_order_release);
+            m_sliceEpoch.fetch_add(1, std::memory_order_release);
 
-            // Wake all threads through the dispatch barrier so they can observe shutdown
-            m_dispatchBarrier.reset(m_threadCount);
-            for (uint32_t i = 0; i < m_threadCount; ++i)
-                m_dispatchBarrier.arrive();
+            // Coordinator arrives as its slot to release workers waiting at the barrier
+            m_dispatchBarrier.arrive();
 
             for (uint32_t i = 0; i < m_threadCount; ++i) {
                 if (m_threads[i].joinable())
@@ -147,16 +145,15 @@ namespace Hades::Runtime {
             m_activeBarrierSize = v_BarrierSize;
             m_config = ro_Config;
             m_currentFactory = ro_Factory;
+            m_runStop.store(false, std::memory_order_release);
+            m_iterationsPerChunk.store(0, std::memory_order_release);
 
-            // Signal threads to start this run
-            m_jobsReady.store(true, std::memory_order_release);
-            m_dispatchBarrier.reset(m_threadCount);
+            // Coordinator arrives as its slot — barrier is cyclic, no reset needed.
+            // Epoch advances only when all workers have also arrived, guaranteeing
+            // setup is visible before any worker proceeds.
+            m_dispatchBarrier.arrive();
 
-            // Owner (caller) thread acts as coordinator - does not participate in stealing
-            // HadesEngine drives the outer loop; ThreadRuntime drives the inner slice loop
             internalCoordinatorLoop(ro_Config, v_BarrierSize);
-
-            m_jobsReady.store(false, std::memory_order_release);
         }
 
         void internalCoordinatorLoop(const Config& ro_Config, uint32_t v_BarrierSize) noexcept {
@@ -190,7 +187,7 @@ namespace Hades::Runtime {
                 // solidify, feedThreadHash, validateSlice, feedSlice
                 // Results are written into m_sliceTimings / m_perThreadTimes by workers
 
-                stats.feedThreadTimes(m_perThreadTimes, m_threadCount);
+                stats.feedThreadTimes(m_perThreadTimes, m_activeBarrierSize);
 
                 SliceTimings timings;
                 timings.cpuWallTime = m_lastSliceWallTime;
@@ -199,8 +196,8 @@ namespace Hades::Runtime {
 
                 stats.feedSlice(timings);
 
-                // Feed hashes into validator (collected by thread 0 in worker loop)
-                for (uint32_t t = 0; t < m_threadCount; ++t)
+                // Feed hashes into validator (collected by chunk 0 owner in worker loop)
+                for (uint32_t t = 0; t < m_activeBarrierSize; ++t)
                     validator.feedThreadHash(m_perThreadHashes[t]);
                 validator.validateSlice();
 
@@ -223,23 +220,17 @@ namespace Hades::Runtime {
             m_result.minSlices = k.minSlices;
             m_result.maxSlices = k.maxSlices;
             m_result.cvThreshold = k.cvThreshold;
+
+            m_runStop.store(true, std::memory_order_release);
+            m_sliceEpoch.fetch_add(1, std::memory_order_release);
+            m_runCompletionBarrier.arrive();
         }
 
         void internalDispatchSlice(uint32_t v_BarrierSize, uint64_t v_IterationsPerChunk) noexcept {
-            // Push one job per participating thread into the Chase-Lev deque
-            for (uint32_t i = 0; i < v_BarrierSize; ++i) {
-                ThreadJob job;
-                job.p_Fixture = m_fixtureSlots[i];   // per-thread fixture pointer
-                job.chunkIndex = i;
-                job.iterationsPerChunk = v_IterationsPerChunk;
-
-                const bool pushed = m_deque.push(job);
-                HADES_ASSERT(pushed);
-                HADES_UNUSED(pushed);
-            }
-
             m_sliceBarrier.reset(v_BarrierSize);
+            m_iterationsPerChunk.store(v_IterationsPerChunk, std::memory_order_release);
             m_sliceComplete.store(false, std::memory_order_release);
+            m_sliceEpoch.fetch_add(1, std::memory_order_release);
         }
 
         void internalWaitSliceComplete() noexcept {
@@ -259,15 +250,15 @@ namespace Hades::Runtime {
             m_adapterSlots[v_ThreadIndex] = static_cast<void*>(&adapter);
 
             // Wait until all threads have registered their slots
-            m_setupBarrier.reset(m_threadCount);
             m_setupBarrier.arrive();
 
             while (true) {
-                // Wait for dispatch signal from coordinator
+                // Wait for coordinator to arrive (signals setup complete for this run)
                 m_dispatchBarrier.arrive();
 
                 if (HADES_UNLIKELY(m_shutdown.load(std::memory_order_acquire)))
                     return;
+
 
                 // Create fixture for this run
                 void* p_Fixture = m_currentFactory.create(m_adapterSlots[v_ThreadIndex]);
@@ -294,6 +285,7 @@ namespace Hades::Runtime {
                 // Cleanup fixture
                 m_currentFactory.destroy(p_Fixture);
                 m_fixtureSlots[v_ThreadIndex] = nullptr;
+                m_runCompletionBarrier.arrive();
             }
         }
 
@@ -301,29 +293,37 @@ namespace Hades::Runtime {
             uint32_t v_ThreadIndex,
             void* p_Fixture,
             adapter_& ro_Adapter) noexcept {
+            uint64_t observedSliceEpoch = m_sliceEpoch.load(std::memory_order_acquire);
+            if (m_iterationsPerChunk.load(std::memory_order_acquire) > 0 && observedSliceEpoch > 0)
+                --observedSliceEpoch;
+
             while (true) {
-                // Try to steal a job
-                ThreadJob job;
-                bool      hasJob = false;
+                while (true) {
+                    if (m_shutdown.load(std::memory_order_acquire) || m_runStop.load(std::memory_order_acquire))
+                        return;
 
-                while (!hasJob) {
-                    using StealResult = Queues::ChaseLevDeque<ThreadJob, DEQUE_CAPACITY>::StealResult;
-                    const StealResult result = m_deque.steal(job);
-
-                    if (result == StealResult::Success) {
-                        hasJob = true;
-                    } else if (result == StealResult::Empty) {
-                        // No job for this thread this slice - go to barrier directly
+                    const uint64_t sliceEpoch = m_sliceEpoch.load(std::memory_order_acquire);
+                    if (sliceEpoch != observedSliceEpoch) {
+                        observedSliceEpoch = sliceEpoch;
                         break;
                     }
-                    // StealResult::Abort -> retry
+
+#if HADES_COMPILER_MSVC
+                    _mm_pause();
+#elif HADES_COMPILER_CLANG || HADES_COMPILER_GCC
+                    __builtin_ia32_pause();
+#endif
                 }
 
-                if (!hasJob) {
-                    // Thread not participating in this slice - still must arrive at barriers
-                    // if it is within the active barrier size
-                    return;
-                }
+                if (v_ThreadIndex >= m_activeBarrierSize)
+                    continue;
+
+                ThreadJob job;
+                job.p_Fixture = p_Fixture;
+                job.chunkIndex = v_ThreadIndex;
+                job.iterationsPerChunk = m_iterationsPerChunk.load(std::memory_order_acquire);
+
+                HADES_ASSERT(job.iterationsPerChunk > 0);
 
                 // --- Execute M iterations ---
                 const uint64_t iters = job.iterationsPerChunk;
@@ -367,13 +367,13 @@ namespace Hades::Runtime {
                 // --- BARRIER 1 - iteration completion ---
                 m_sliceBarrier.arrive();
 
-                // Thread 0 responsibilities after BARRIER 1
-                if (v_ThreadIndex == 0) {
+                // Chunk 0 responsibilities after BARRIER 1
+                if (job.chunkIndex == 0) {
                     // Solidify: pull fixture output to host
                     ro_Adapter.synchronize();
 
                     // Collect per-thread hashes
-                    for (uint32_t t = 0; t < m_threadCount; ++t) {
+                    for (uint32_t t = 0; t < m_activeBarrierSize; ++t) {
                         m_perThreadHashes[t] = m_currentFactory.hash(m_fixtureSlots[t]);
                     }
 
@@ -382,7 +382,7 @@ namespace Hades::Runtime {
                     double maxKernel = 0.0;
                     double maxDriver = 0.0;
 
-                    for (uint32_t t = 0; t < m_threadCount; ++t) {
+                    for (uint32_t t = 0; t < m_activeBarrierSize; ++t) {
                         if (m_perThreadTimes[t] > maxWall)   maxWall = m_perThreadTimes[t];
                         if (m_perThreadKernelTimes[t] > maxKernel) maxKernel = m_perThreadKernelTimes[t];
                         if (m_perThreadDriverOverhead[t] > maxDriver) maxDriver = m_perThreadDriverOverhead[t];
@@ -396,7 +396,7 @@ namespace Hades::Runtime {
                 // --- BARRIER 2 - post-validation ---
                 m_sliceBarrier.arrive();
 
-                if (v_ThreadIndex == 0)
+                if (job.chunkIndex == 0)
                     m_sliceComplete.store(true, std::memory_order_release);
 
                 // Check if coordinator wants to stop
@@ -414,14 +414,15 @@ namespace Hades::Runtime {
         std::atomic<bool>  m_shutdown;
         std::atomic<bool>  m_jobsReady;
         std::atomic<bool>  m_sliceComplete;
+        std::atomic<bool>  m_runStop;
+        std::atomic<uint64_t> m_sliceEpoch;
+        std::atomic<uint64_t> m_iterationsPerChunk;
 
         // Barriers
         CyclicBarrier m_dispatchBarrier;   // used between runs - all threads idle here
         CyclicBarrier m_setupBarrier;      // used once at startup for slot registration
         CyclicBarrier m_sliceBarrier;      // used per slice (two arrives per slice)
-
-        // Chase-Lev deque - jobs pushed by coordinator, stolen by workers
-        Queues::ChaseLevDeque<ThreadJob, DEQUE_CAPACITY> m_deque;
+        CyclicBarrier m_runCompletionBarrier; // used once per run to prevent next-run overlap
 
         // Current run context
         FixtureFactory m_currentFactory = {};

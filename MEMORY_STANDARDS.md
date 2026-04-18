@@ -1,7 +1,7 @@
-# Spectra Memory & Ownership Standards
+# Hades Memory & Ownership Standards
 
 ## Motivation
-Spectra enforces strict performance and memory correctness constraints, defining how memory is allocated, passed, cleaned up, and structured to ensure high throughput, cache-friendliness, and debug-ability, where every byte, bounce, and allocation matters.
+Hades enforces strict performance and memory correctness constraints, defining how memory is allocated, passed, cleaned up, and structured to ensure high throughput, cache-friendliness, and debug-ability, where every byte, bounce, and allocation matters.
 
 ## A) Allocator Rules
 1. Raw `new` and `delete` are banned for bypassing sanitation, tracking, and instrumentation tools, requiring all memory to be acquired via allocators like `ArenaAllocator` or `PlatformPageAllocator`.
