@@ -5,7 +5,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(Hades-Core-Tests TomlIOTests.cpp)
+add_executable(Hades-Core-Tests
+    main.cpp
+    TomlIOTests.cpp
+    SuiteDriverTests.cpp
+)
 target_link_libraries(Hades-Core-Tests PRIVATE Hades-Core)
 
 target_compile_options(Hades-Core-Tests PRIVATE

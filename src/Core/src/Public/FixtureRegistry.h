@@ -56,18 +56,21 @@ namespace Hades::Runtime {
 		IFixtureVirtual() = default;
 	};
 
-	// Owns the concrete fixture, holds a reference to the externally-owned
-	// concrete adapter, and forwards run() to SequentialRunner<D,A,C,H> - a
-	// fully static call, no virtual dispatch past this one boundary.
+	// Owns both the concrete adapter and the concrete fixture, constructing
+	// each fresh per test (v2->v3 execution model, SS1.2: "construct one
+	// adapter instance; construct one fixture instance ... destroy fixture,
+	// destroy adapter" happens once per queued test, not once per process).
+	// forwards run() to SequentialRunner<D,A,C,H> - a fully static call, no
+	// virtual dispatch past this one boundary.
 	template<typename D, typename A, typename C, typename H>
 	class ConcreteFixtureRunner final : public IFixtureVirtual {
 		using fixture_ = D;
 		using adapter_ = A;
 
 	public:
-		explicit ConcreteFixtureRunner(adapter_& ro_Adapter) noexcept
-			: m_adapter(ro_Adapter)
-			, m_fixture(ro_Adapter) {
+		ConcreteFixtureRunner() noexcept
+			: m_adapter()
+			, m_fixture(m_adapter) {
 		}
 
 		~ConcreteFixtureRunner() override = default;
@@ -77,8 +80,8 @@ namespace Hades::Runtime {
 		}
 
 	private:
-		adapter_& m_adapter;
-		fixture_  m_fixture;
+		adapter_ m_adapter;
+		fixture_ m_fixture;
 	};
 
 	// Explicit bootstrap registry - never static-init auto-registration
@@ -86,7 +89,12 @@ namespace Hades::Runtime {
 	// touches fixtures only through the IFixtureVirtual shim.
 	class HADES_RUNTIME_API FixtureRegistry final {
 	public:
-		using FactoryFn = std::function<std::unique_ptr<IFixtureVirtual>(IDeviceAdapterBase&)>;
+		// Zero-argument and self-contained: the only place that ever knows the
+		// concrete AdapterType is the HADES_REGISTER_FIXTURE call site itself
+		// (in generated, per-suite code), so the factory closure constructs its
+		// own adapter+fixture pair rather than requiring a caller (SuiteDriver)
+		// that is deliberately adapter-type-agnostic to construct one first.
+		using FactoryFn = std::function<std::unique_ptr<IFixtureVirtual>()>;
 
 		FixtureRegistry() = default;
 		~FixtureRegistry() = default;
@@ -105,15 +113,11 @@ namespace Hades::Runtime {
 		std::unordered_map<std::string, FactoryFn> m_factories;
 	};
 
-	// AdapterType static_cast recovers the concrete adapter type from the
-	// type-erased IDeviceAdapterBase& the caller passes at run time.
-	// ChronoType/HashType are explicit here because SequentialRunner resolves
-	// both at compile time - there is no runtime "backend" switch once a
-	// fixture is registered.
+	// AdapterType/ChronoType/HashType are all resolved at compile time here -
+	// there is no runtime "backend" switch once a fixture is registered.
 	#define HADES_REGISTER_FIXTURE(Registry, Name, AdapterType, ChronoType, HashType) \
-		(Registry).registerFixture(#Name, [](Hades::Runtime::IDeviceAdapterBase& ro_Adapter) { \
-			return std::make_unique<Hades::Runtime::ConcreteFixtureRunner<Name, AdapterType, ChronoType, HashType>>( \
-				static_cast<AdapterType&>(ro_Adapter)); \
+		(Registry).registerFixture(#Name, []() { \
+			return std::make_unique<Hades::Runtime::ConcreteFixtureRunner<Name, AdapterType, ChronoType, HashType>>(); \
 		})
 
 } // namespace Hades::Runtime

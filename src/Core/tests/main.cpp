@@ -18,8 +18,21 @@
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
-#pragma once
-#include <iostream>
-#include <string>
-#include <vector>
-#include <memory>
+#include "TestFramework.h"
+
+#include <cstdio>
+
+void runTomlIOTests();
+void runSuiteDriverTests();
+
+int main() {
+	runTomlIOTests();
+	runSuiteDriverTests();
+
+	if (HadesTests::failureCount() == 0) {
+		std::printf("ALL PASSED\n");
+		return 0;
+	}
+	std::printf("%d FAILURE(S)\n", HadesTests::failureCount());
+	return 1;
+}

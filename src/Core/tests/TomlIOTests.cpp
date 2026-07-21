@@ -1,11 +1,30 @@
+/*
+* Copyright (c) 2026 StormWeaver
+*
+* This file is part of the Hades Benchmarking API
+*
+* Licensed under the MIT License. You may obtain a copy of the License at
+* https://opensource.org/licenses/MIT
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
+*/
 // Standalone unit tests for TomlIO.h / Configuration.h's suite.toml support.
 // Not a Hades fixture/benchmark - this exercises Hades' own infrastructure,
 // so it deliberately does not use HadesEngine/ValidationFixture (TEST_FORMAT.md's
 // harness is for testing *other* libraries' fixtures via Hades, not for
 // testing Hades' own reader/writer code before HadesEngine v3 even exists).
-//
-// Minimal local PASS/FAIL framework: EXPECT_TRUE logs and counts failures but
-// keeps running so one bad assumption doesn't hide the rest of the report.
+
+#include "TestFramework.h"
 
 #include <Configuration.h>
 #include <TomlIO.h>
@@ -16,18 +35,6 @@
 using namespace Hades::Runtime;
 
 namespace {
-
-	int g_failures = 0;
-
-	void expectTrueImpl(bool v_Condition, const char* v_Expr, const char* v_File, int v_Line) {
-		if (!v_Condition) {
-			std::printf("  FAIL %s:%d: %s\n", v_File, v_Line, v_Expr);
-			++g_failures;
-		}
-	}
-
-#define EXPECT_TRUE(expr) expectTrueImpl((expr), #expr, __FILE__, __LINE__)
-#define EXPECT_EQ(a, b)   expectTrueImpl((a) == (b), #a " == " #b, __FILE__, __LINE__)
 
 	bool writeFile(const std::string& v_Path, const std::string& v_Content) {
 		std::FILE* l_file = std::fopen(v_Path.c_str(), "wb");
@@ -217,7 +224,7 @@ namespace {
 
 } // namespace
 
-int main() {
+void runTomlIOTests() {
 	testRoundTrip();
 	testRejectsSingleBracketTable();
 	testInvalidKindRejected();
@@ -228,11 +235,4 @@ int main() {
 	testNegativeNumbersAndComments();
 	testMissingFileReported();
 	testAppendWriteDoesNotTouchExisting();
-
-	if (g_failures == 0) {
-		std::printf("ALL PASSED\n");
-		return 0;
-	}
-	std::printf("%d FAILURE(S)\n", g_failures);
-	return 1;
 }
