@@ -50,7 +50,7 @@ cmake --build build
 hades-driver init-suite my-suite   # or find-suite, to adopt an existing one
 ```
 
-This creates `suite.toml`/`registry.ini` in `my-suite/` and remembers it as the current suite (via a `.hades-suite` marker in your cwd) for every command below.
+This creates `suite.toml`/`registry.ini` in `my-suite/` and remembers it as the current suite (via a `.hades-suite` marker in your cwd) for every command below. `hades-driver rm my-suite` deletes a suite outright (and clears the marker if it was the adopted one).
 
 ### 2. Write a fixture
 
