@@ -32,6 +32,7 @@ namespace Hades::Driver {
 
 	int cmdInitSuite(const std::vector<std::string>& v_Args);
 	int cmdFindSuite(const std::vector<std::string>& v_Args);
+	int cmdRemoveSuite(const std::vector<std::string>& v_Args);
 	int cmdNewTest(const std::vector<std::string>& v_Args);
 	int cmdRun(const std::vector<std::string>& v_Args);
 	int cmdValidate(const std::vector<std::string>& v_Args);

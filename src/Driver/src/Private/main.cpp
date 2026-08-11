@@ -38,6 +38,7 @@ namespace {
 			"commands:\n"
 			"  init-suite <dir>        create a hades-gen/ suite and adopt it\n"
 			"  find-suite <dir>        adopt an existing hades-gen/ suite\n"
+			"  rm <dir>                delete a suite (and un-adopt it if currently adopted)\n"
 			"  new-test <fixture> <id> [--header=] [--adapter=] [--chrono=] [--hash=] [--kind=]\n"
 			"  run [--build=cmake] [--fbt=<pattern>] [--format=console|json]\n"
 			"  validate [--build=cmake]\n";
@@ -62,6 +63,7 @@ int main(int v_Argc, char** p_Argv) {
 
 	if (l_command == "init-suite") return Hades::Driver::cmdInitSuite(l_rest);
 	if (l_command == "find-suite") return Hades::Driver::cmdFindSuite(l_rest);
+	if (l_command == "rm")         return Hades::Driver::cmdRemoveSuite(l_rest);
 	if (l_command == "new-test")   return Hades::Driver::cmdNewTest(l_rest);
 	if (l_command == "run")        return Hades::Driver::cmdRun(l_rest);
 	if (l_command == "validate")   return Hades::Driver::cmdValidate(l_rest);

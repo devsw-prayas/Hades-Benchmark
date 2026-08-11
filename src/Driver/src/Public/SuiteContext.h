@@ -38,4 +38,11 @@ namespace Hades::Driver {
 	// like a valid suite.
 	bool loadCurrentSuite(std::string& ro_OutSuiteDir);
 
+	// If SUITE_MARKER_FILE in cwd currently points at v_SuiteDir (compared by
+	// absolute path), deletes the marker - so removing the adopted suite
+	// doesn't leave 'find-suite'/'run'/etc. pointing at a directory that no
+	// longer exists. A no-op (not an error) if no suite is adopted, or the
+	// adopted one is a different directory.
+	void clearSuiteIfCurrent(const std::string& v_SuiteDir);
+
 }

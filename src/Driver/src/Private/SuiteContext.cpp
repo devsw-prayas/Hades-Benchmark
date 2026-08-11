@@ -69,4 +69,29 @@ namespace Hades::Driver {
 		return true;
 	}
 
+	void clearSuiteIfCurrent(const std::string& v_SuiteDir) {
+		std::error_code l_ec;
+		const fs::path l_target = fs::absolute(fs::path(v_SuiteDir), l_ec);
+		if (l_ec) {
+			return;
+		}
+
+		std::ifstream l_marker(SUITE_MARKER_FILE, std::ios::binary);
+		if (!l_marker.is_open()) {
+			return;
+		}
+		std::ostringstream l_stream;
+		l_stream << l_marker.rdbuf();
+		l_marker.close();
+
+		std::string l_current = l_stream.str();
+		while (!l_current.empty() && (l_current.back() == '\n' || l_current.back() == '\r')) {
+			l_current.pop_back();
+		}
+
+		if (l_current == l_target.generic_string()) {
+			fs::remove(SUITE_MARKER_FILE, l_ec);
+		}
+	}
+
 }

@@ -180,6 +180,31 @@ namespace Hades::Driver {
 		return 0;
 	}
 
+	int cmdRemoveSuite(const std::vector<std::string>& v_Args) {
+		if (v_Args.empty()) {
+			std::cerr << "usage: rm <suite-dir>\n";
+			return 2;
+		}
+		const std::string l_dir = v_Args[0];
+
+		if (!fs::exists(fs::path(l_dir) / "suite.toml")) {
+			std::cerr << "error: '" << l_dir << "' does not look like a hades-gen suite (missing suite.toml)\n";
+			return 1;
+		}
+
+		std::error_code l_ec;
+		fs::remove_all(l_dir, l_ec);
+		if (l_ec) {
+			std::cerr << "error: could not remove '" << l_dir << "': " << l_ec.message() << "\n";
+			return 1;
+		}
+
+		clearSuiteIfCurrent(l_dir);
+
+		std::cout << "removed suite at '" << l_dir << "'\n";
+		return 0;
+	}
+
 	int cmdNewTest(const std::vector<std::string>& v_Args) {
 		if (v_Args.size() < 2) {
 			std::cerr << "usage: new-test <fixture-name> <test-id> [--header=<path>] [--adapter=<type>] "
