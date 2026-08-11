@@ -80,6 +80,10 @@ namespace Hades::Runtime {
 			ro_Fixture.startup();
 			CompletionFence::signal();
 
+			if (ro_Config.m_Kind == TestKind::Correctness) {
+				return internalRunCorrectnessOnce(ro_Fixture, ro_Adapter, chrono, runStart, v_IsGpuRun);
+			}
+
 			for (uint32_t i = 0; i < ro_Config.m_WarmupCount; ++i) {
 				ro_Fixture.execute();
 				ro_Adapter.synchronize();
@@ -144,6 +148,42 @@ namespace Hades::Runtime {
 		}
 
 	private:
+		// TestKind::Correctness: execute() called exactly once (no warmup, no
+		// calibration, no CV-converging slice loop) - Pass/Failed only. There
+		// is no reference hash to diverge from on a single call, so the run is
+		// trivially deterministic; a fixture that wants a real correctness
+		// check asserts/traps inside executeImpl() itself.
+		template<typename T>
+		HADES_NODISCARD_MSG("Cannot discard benchmark result")
+			static BenchmarkResult internalRunCorrectnessOnce(
+				fixture_& ro_Fixture, adapter_& ro_Adapter, chrono_& ro_Chrono,
+				T v_RunStart, bool v_IsGpuRun) noexcept {
+			ro_Fixture.execute();
+			ro_Adapter.synchronize();
+			CompletionFence::signal();
+
+			const uint64_t hash = ro_Fixture.getDeterminismHash();
+
+			ro_Fixture.reset(ro_Adapter);
+			CompletionFence::signal();
+			ro_Fixture.teardown();
+
+			const auto runEnd = ro_Chrono.now();
+
+			BenchmarkResult result{};
+			result.totalRunTime = internalSecondsBetween(ro_Chrono, v_RunStart, runEnd);
+			result.threadCount = 1;
+			result.iterationsPerSlice = 1;
+			result.sliceCount = 1;
+			result.deterministic = true;
+			result.referenceHash = hash;
+			result.uniqueHashCount = 1;
+			result.runFailed = false;
+			result.isGpuRun = v_IsGpuRun;
+			result.isHotspotRun = false;
+			return result;
+		}
+
 		// Config.m_Iterations == 0 ("calibration-derived") resolves to a single
 		// execute() call per slice - deriveKnobs already scales min/max slice
 		// counts for sub-100us fixtures, so noise is absorbed by taking more
