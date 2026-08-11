@@ -36,12 +36,12 @@ namespace Hades::Runtime {
 				return false;
 			}
 
-			std::fseek(l_file, 0, SEEK_END);
+			HADES_UNUSED(std::fseek(l_file, 0, SEEK_END));
 			const long l_size = std::ftell(l_file);
-			std::fseek(l_file, 0, SEEK_SET);
+			HADES_UNUSED(std::fseek(l_file, 0, SEEK_SET));
 
 			if (l_size < 0) {
-				std::fclose(l_file);
+				HADES_UNUSED(std::fclose(l_file));
 				return false;
 			}
 
@@ -49,7 +49,7 @@ namespace Hades::Runtime {
 			const size_t l_read = l_size > 0
 				? std::fread(ro_OutContent.data(), 1, static_cast<size_t>(l_size), l_file)
 				: 0;
-			std::fclose(l_file);
+			HADES_UNUSED(std::fclose(l_file));
 
 			return l_read == static_cast<size_t>(l_size);
 		}
@@ -63,7 +63,7 @@ namespace Hades::Runtime {
 			const size_t l_written = ro_Content.empty()
 				? 0
 				: std::fwrite(ro_Content.data(), 1, ro_Content.size(), l_file);
-			std::fclose(l_file);
+			HADES_UNUSED(std::fclose(l_file));
 
 			return l_written == ro_Content.size();
 		}
@@ -342,7 +342,7 @@ namespace Hades::Runtime {
 			bool m_inTargetTable = false;
 		};
 
-	} // namespace
+	}
 
 	bool readToml(const std::string& v_Path, const std::string& v_ArrayName,
 	              std::vector<TomlTable>& ro_OutTables, std::vector<TomlParseError>& ro_OutErrors) {
@@ -419,4 +419,4 @@ namespace Hades::Runtime {
 		return nullptr;
 	}
 
-} // namespace Hades::Runtime
+}

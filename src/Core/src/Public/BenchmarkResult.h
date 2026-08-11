@@ -85,4 +85,4 @@ namespace Hades::Runtime {
     HADES_STATIC_ASSERT(std::is_trivially_copy_assignable_v<BenchmarkResult>, "Benchmark must be trivially copyable");
     HADES_STATIC_ASSERT(std::is_trivially_move_assignable_v<BenchmarkResult>, "Benchmark must be trivially move assignable");
 
-} // namespace Hades
+}

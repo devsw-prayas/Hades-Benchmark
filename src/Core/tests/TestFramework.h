@@ -41,7 +41,7 @@ namespace HadesTests {
 		}
 	}
 
-} // namespace HadesTests
+}
 
 #define EXPECT_TRUE(expr) ::HadesTests::expectTrueImpl((expr), #expr, __FILE__, __LINE__)
 #define EXPECT_EQ(a, b)   ::HadesTests::expectTrueImpl((a) == (b), #a " == " #b, __FILE__, __LINE__)

@@ -18,35 +18,21 @@
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
-#pragma once
-#include "HadesCompiler.h"
+#include "ProcessExec.h"
 
-#if defined(HADES_SHARED)
-#if HADES_COMPILER_MSVC
-#if defined(HADES_BUILDING_RUNTIME)
-#define HADES_RUNTIME_API __declspec(dllexport)
-#else
-#define HADES_RUNTIME_API __declspec(dllimport)
-#endif
-#elif HADES_COMPILER_CLANG || HADES_COMPILER_GCC
-#define HADES_RUNTIME_API __attribute__((visibility("default")))
-#else
-#define HADES_RUNTIME_API
-#endif
+#include <cstdlib>
 
-#else
-// Static build -> no import/export
-#define HADES_RUNTIME_API __declspec(dllexport)
-#endif
+namespace Hades::Driver {
 
-#include <cstdint>
-#include <type_traits>
-#include <atomic>
-#include <cstddef>
-#include <memory>
-#include <functional>
-#include <cstring>
-#include <cmath>
-#include <cstdio>
-#include <string>
-#include <vector>
+	std::string quotePath(const std::string& v_Path) {
+		if (!v_Path.empty() && v_Path.front() == '"') {
+			return v_Path;
+		}
+		return "\"" + v_Path + "\"";
+	}
+
+	int runProcess(const std::string& v_Command) {
+		return std::system(v_Command.c_str());
+	}
+
+}

@@ -30,14 +30,35 @@
 #include <TomlIO.h>
 
 #include <cstdio>
+#include <filesystem>
 #include <string>
 
 using namespace Hades::Runtime;
 
 namespace {
 
-	bool writeFile(const std::string& v_Path, const std::string& v_Content) {
-		std::FILE* l_file = std::fopen(v_Path.c_str(), "wb");
+	namespace fs = std::filesystem;
+
+	// All t_*.toml fixture files live under a scratch subdirectory of the
+	// system temp path rather than cwd, so running the test binary from an
+	// arbitrary directory doesn't litter it - runTomlIOTests() tears this
+	// down at the end.
+	const fs::path& scratchDir() {
+		static const fs::path s_dir = [] {
+			fs::path l_dir = fs::temp_directory_path() / "hades-tomlio-tests";
+			fs::create_directories(l_dir);
+			return l_dir;
+		}();
+		return s_dir;
+	}
+
+	std::string scratchPath(const std::string& v_Name) {
+		return (scratchDir() / v_Name).string();
+	}
+
+	bool writeFile(const std::string& v_Name, const std::string& v_Content) {
+		const std::string l_path = scratchPath(v_Name);
+		std::FILE* l_file = std::fopen(l_path.c_str(), "wb");
 		if (l_file == nullptr) {
 			return false;
 		}
@@ -68,7 +89,7 @@ namespace {
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(readSuiteToml("t_roundtrip_in.toml", l_entries, l_errors));
+		EXPECT_TRUE(readSuiteToml(scratchPath("t_roundtrip_in.toml"), l_entries, l_errors));
 		EXPECT_EQ(l_errors.size(), 0u);
 		EXPECT_EQ(l_entries.size(), 2u);
 
@@ -87,11 +108,11 @@ namespace {
 			EXPECT_EQ(l_entries[1].m_Config.m_WarmupCount, 0u);
 		}
 
-		EXPECT_TRUE(writeSuiteToml("t_roundtrip_out.toml", l_entries, false));
+		EXPECT_TRUE(writeSuiteToml(scratchPath("t_roundtrip_out.toml"), l_entries, false));
 
 		std::vector<SuiteTestEntry> l_entries2;
 		std::vector<TomlParseError> l_errors2;
-		EXPECT_TRUE(readSuiteToml("t_roundtrip_out.toml", l_entries2, l_errors2));
+		EXPECT_TRUE(readSuiteToml(scratchPath("t_roundtrip_out.toml"), l_entries2, l_errors2));
 		EXPECT_EQ(l_errors2.size(), 0u);
 		EXPECT_EQ(l_entries2.size(), l_entries.size());
 		for (size_t l_i = 0; l_i < l_entries.size() && l_i < l_entries2.size(); ++l_i) {
@@ -110,7 +131,7 @@ namespace {
 
 		std::vector<TomlTable> l_tables;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(!readToml("t_singlebracket.toml", "test", l_tables, l_errors));
+		EXPECT_TRUE(!readToml(scratchPath("t_singlebracket.toml"), "test", l_tables, l_errors));
 		EXPECT_EQ(l_errors.size(), 1u);
 	}
 
@@ -121,7 +142,7 @@ namespace {
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(!readSuiteToml("t_badkind.toml", l_entries, l_errors));
+		EXPECT_TRUE(!readSuiteToml(scratchPath("t_badkind.toml"), l_entries, l_errors));
 		EXPECT_TRUE(!l_errors.empty());
 		EXPECT_EQ(l_entries.size(), 0u);
 	}
@@ -132,7 +153,7 @@ namespace {
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(!readSuiteToml("t_missing.toml", l_entries, l_errors));
+		EXPECT_TRUE(!readSuiteToml(scratchPath("t_missing.toml"), l_entries, l_errors));
 		EXPECT_EQ(l_errors.size(), 2u); // missing id + missing fixture
 		EXPECT_EQ(l_entries.size(), 0u);
 	}
@@ -144,7 +165,7 @@ namespace {
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(!readSuiteToml("t_unknown.toml", l_entries, l_errors));
+		EXPECT_TRUE(!readSuiteToml(scratchPath("t_unknown.toml"), l_entries, l_errors));
 		EXPECT_EQ(l_errors.size(), 1u);
 		EXPECT_EQ(l_entries.size(), 1u); // entry still parsed - unknown key is reported, not fatal to the rest
 	}
@@ -156,7 +177,7 @@ namespace {
 
 		std::vector<TomlTable> l_tables;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(!readToml("t_dupe.toml", "test", l_tables, l_errors));
+		EXPECT_TRUE(!readToml(scratchPath("t_dupe.toml"), "test", l_tables, l_errors));
 		EXPECT_TRUE(!l_errors.empty());
 	}
 
@@ -167,7 +188,7 @@ namespace {
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(readSuiteToml("t_escape.toml", l_entries, l_errors));
+		EXPECT_TRUE(readSuiteToml(scratchPath("t_escape.toml"), l_entries, l_errors));
 		if (l_entries.size() == 1) {
 			EXPECT_EQ(l_entries[0].m_Config.m_Id, "has \"quotes\" and \\backslash\\");
 		} else {
@@ -186,7 +207,7 @@ namespace {
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(readSuiteToml("t_negcomment.toml", l_entries, l_errors));
+		EXPECT_TRUE(readSuiteToml(scratchPath("t_negcomment.toml"), l_entries, l_errors));
 		if (l_entries.size() == 1) {
 			EXPECT_EQ(l_entries[0].m_Config.m_Id, "neg");
 			EXPECT_EQ(l_entries[0].m_Config.m_CvThreshold, -0.5);
@@ -199,7 +220,7 @@ namespace {
 		std::printf("testMissingFileReported\n");
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(!readSuiteToml("t_does_not_exist.toml", l_entries, l_errors));
+		EXPECT_TRUE(!readSuiteToml(scratchPath("t_does_not_exist.toml"), l_entries, l_errors));
 		EXPECT_EQ(l_errors.size(), 1u);
 	}
 
@@ -210,11 +231,11 @@ namespace {
 		SuiteTestEntry l_second;
 		setId(l_second.m_Config, "second");
 		l_second.m_FixtureName = "F2";
-		EXPECT_TRUE(writeSuiteToml("t_append.toml", { l_second }, true));
+		EXPECT_TRUE(writeSuiteToml(scratchPath("t_append.toml"), { l_second }, true));
 
 		std::vector<SuiteTestEntry> l_entries;
 		std::vector<TomlParseError> l_errors;
-		EXPECT_TRUE(readSuiteToml("t_append.toml", l_entries, l_errors));
+		EXPECT_TRUE(readSuiteToml(scratchPath("t_append.toml"), l_entries, l_errors));
 		EXPECT_EQ(l_entries.size(), 2u);
 		if (l_entries.size() == 2) {
 			EXPECT_EQ(l_entries[0].m_Config.m_Id, "first");
@@ -222,7 +243,7 @@ namespace {
 		}
 	}
 
-} // namespace
+}
 
 void runTomlIOTests() {
 	testRoundTrip();
@@ -235,4 +256,6 @@ void runTomlIOTests() {
 	testNegativeNumbersAndComments();
 	testMissingFileReported();
 	testAppendWriteDoesNotTouchExisting();
+
+	fs::remove_all(scratchDir());
 }

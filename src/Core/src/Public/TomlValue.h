@@ -27,9 +27,9 @@
 #include <vector>
 
 // Minimal, hand-rolled TOML value model - only the subset the suite manifest
-// grammar needs (SS1.14 of the Hades v3 Architecture doc): flat scalar
-// key = value pairs inside repeated [[array-of-tables]] blocks. No nested
-// tables, no inline tables, no arrays-as-values, no multi-line strings.
+// grammar needs: flat scalar key = value pairs inside repeated
+// [[array-of-tables]] blocks. No nested tables, no inline tables, no
+// arrays-as-values, no multi-line strings.
 
 namespace Hades::Runtime {
 
@@ -57,4 +57,4 @@ namespace Hades::Runtime {
 		std::string m_Message;
 	};
 
-} // namespace Hades::Runtime
+}

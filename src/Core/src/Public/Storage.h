@@ -53,4 +53,4 @@ namespace Hades::Runtime {
         IStorageBackend& operator=(IStorageBackend&&) = delete;
     };
 
-} // namespace Hades
+}

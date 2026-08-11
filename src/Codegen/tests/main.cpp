@@ -18,35 +18,19 @@
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
-#pragma once
-#include "HadesCompiler.h"
+#include "TestFramework.h"
 
-#if defined(HADES_SHARED)
-#if HADES_COMPILER_MSVC
-#if defined(HADES_BUILDING_RUNTIME)
-#define HADES_RUNTIME_API __declspec(dllexport)
-#else
-#define HADES_RUNTIME_API __declspec(dllimport)
-#endif
-#elif HADES_COMPILER_CLANG || HADES_COMPILER_GCC
-#define HADES_RUNTIME_API __attribute__((visibility("default")))
-#else
-#define HADES_RUNTIME_API
-#endif
-
-#else
-// Static build -> no import/export
-#define HADES_RUNTIME_API __declspec(dllexport)
-#endif
-
-#include <cstdint>
-#include <type_traits>
-#include <atomic>
-#include <cstddef>
-#include <memory>
-#include <functional>
-#include <cstring>
-#include <cmath>
 #include <cstdio>
-#include <string>
-#include <vector>
+
+void runCodegenTests();
+
+int main() {
+	runCodegenTests();
+
+	if (HadesTests::failureCount() == 0) {
+		std::printf("ALL PASSED\n");
+		return 0;
+	}
+	std::printf("%d FAILURE(S)\n", HadesTests::failureCount());
+	return 1;
+}

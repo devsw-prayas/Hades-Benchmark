@@ -24,6 +24,8 @@
 #include <HadesCompiler.h>
 #include <HadesDiagnostics.h>
 
+#include <chrono>
+
 #include "Adapter.h"
 
 namespace Hades::Runtime {
@@ -32,7 +34,7 @@ namespace Hades::Runtime {
         std::chrono::steady_clock::time_point tp = {};
     };
 
-    class HADES_RUNTIME_API NullDeviceAdapter final
+    class NullDeviceAdapter final
         : public IDeviceAdapter<NullDeviceAdapter>
         , public IDeviceAdapterBase {
     public:
@@ -83,13 +85,8 @@ namespace Hades::Runtime {
 }
 
 
-// CudaDeviceAdapter - stub (GPU, not yet implemented)
-//
-// These will be provided in a future phase once GPU support is added.
-// Include guards below prevent accidental use before implementation.
-
 #ifdef HADES_ENABLE_CUDA
 HADES_STATIC_ASSERT(false,
               "CudaDeviceAdapter is not yet implemented. "
-              "Do not define HADES_ENABLE_CUDA until  GPU implementation is complete.");
+              "Do not define HADES_ENABLE_CUDA until GPU implementation is complete.");
 #endif

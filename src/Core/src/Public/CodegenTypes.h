@@ -27,8 +27,7 @@
 
 // Shared, ABI-neutral request POD types passed across the Codegen boundary.
 // Owned by Core (not Codegen) so that Driver and any external consumer (e.g.
-// Spectra's SVK) can construct these without linking Codegen's DLL first -
-// see Hades v3 Architecture doc SS2.
+// Spectra's SVK) can construct these without linking Codegen's DLL first.
 
 namespace Hades::Runtime {
 
@@ -41,6 +40,15 @@ namespace Hades::Runtime {
 		std::string m_AdapterType;    // e.g. "CudaDeviceAdapter"
 		std::string m_ChronoType;     // e.g. "RdtscChronoPoint"
 		std::string m_HashType;       // e.g. "Fnv1aHashAccumulator"
+
+		// Optional: lets a fixture benchmark an external CMake target outside
+		// Hades-Benchmark itself (e.g. one of Spectra's own modules) without
+		// Codegen needing to know anything about it beyond a path + target
+		// name. Both empty (the common case) = no extra dependency. Not a doc
+		// concept - added because nothing else lets the generated suite link
+		// anything but Hades-Core.
+		std::string m_ExtraLinkDir;      // path to the external target's CMakeLists.txt directory
+		std::string m_ExtraLinkTarget;   // its CMake target name
 	};
 
 	// Input to IHadesCodegen::scaffold() - "new-test" subcommand. Describes a
@@ -61,4 +69,4 @@ namespace Hades::Runtime {
 		std::vector<SuiteTestEntry>    m_Tests;          // declaration-ordered, from suite.toml
 	};
 
-} // namespace Hades::Runtime
+}

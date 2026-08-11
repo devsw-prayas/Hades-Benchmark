@@ -151,15 +151,14 @@ namespace Hades::Runtime {
 			return l_table;
 		}
 
-	} // namespace
+	}
 
 	bool readSuiteToml(const std::string& v_Path, std::vector<SuiteTestEntry>& ro_OutTests,
 	                    std::vector<TomlParseError>& ro_OutErrors) {
 		ro_OutTests.clear();
 
 		std::vector<TomlTable> l_tables;
-		const bool l_readOk = readToml(v_Path, "test", l_tables, ro_OutErrors);
-		HADES_UNUSED(l_readOk); // failure is reflected via ro_OutErrors below
+		readToml(v_Path, "test", l_tables, ro_OutErrors);
 
 		for (size_t l_i = 0; l_i < l_tables.size(); ++l_i) {
 			SuiteTestEntry l_entry;
@@ -181,4 +180,4 @@ namespace Hades::Runtime {
 		return writeToml(v_Path, "test", l_tables, v_Append);
 	}
 
-} // namespace Hades::Runtime
+}

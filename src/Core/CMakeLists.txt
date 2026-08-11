@@ -9,10 +9,21 @@ file(GLOB_RECURSE HadesCore_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DI
 file(GLOB_RECURSE HadesCore_SOURCE  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/Private/*.cpp")
 file(GLOB_RECURSE HadesCore_INL     CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/Public/*.inl")
 
-add_library(Hades-Core STATIC
+add_library(Hades-Core SHARED
     ${HadesCore_HEADERS}
     ${HadesCore_SOURCE}
     ${HadesCore_INL}
+)
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
+    ${HadesCore_HEADERS}
+    ${HadesCore_SOURCE}
+    ${HadesCore_INL}
+)
+
+target_compile_definitions(Hades-Core
+    PUBLIC  HADES_SHARED
+    PRIVATE HADES_BUILDING_RUNTIME
 )
 
 target_include_directories(Hades-Core PUBLIC
@@ -20,6 +31,8 @@ target_include_directories(Hades-Core PUBLIC
 )
 
 target_precompile_headers(Hades-Core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/Public/Hades.h)
+
+set_target_properties(Hades-Core PROPERTIES FOLDER "Reflection")
 
 target_compile_options(Hades-Core PRIVATE
     $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/arch:AVX2 /W4 /permissive->

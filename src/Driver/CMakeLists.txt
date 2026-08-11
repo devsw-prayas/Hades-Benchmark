@@ -15,11 +15,19 @@ add_executable(Hades-Driver
     ${HadesDriver_INL}
 )
 
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
+    ${HadesDriver_HEADERS}
+    ${HadesDriver_SOURCE}
+    ${HadesDriver_INL}
+)
+
 target_include_directories(Hades-Driver PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Public
 )
 
 target_precompile_headers(Hades-Driver PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/Public/HadesDriver.h)
+
+set_target_properties(Hades-Driver PROPERTIES FOLDER "Reflection")
 
 target_compile_options(Hades-Driver PRIVATE
     $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/arch:AVX2 /W4 /permissive->

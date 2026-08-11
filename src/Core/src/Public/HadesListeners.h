@@ -148,4 +148,4 @@ namespace Hades::Runtime {
 			TestOutcome worstOutcome() const noexcept { return m_worstOutcome; }
 	};
 
-} // namespace Hades::Runtime
+}

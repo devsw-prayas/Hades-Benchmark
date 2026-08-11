@@ -32,11 +32,11 @@
 
 namespace Hades::Runtime {
 
-	// Precompiled, non-template - same bucket as FixtureRegistry/IHadesListener
-	// (SS1.1). Loops over its queued tests in declaration order (no dependency
-	// DAG - order of appearance is execution order, SS1.14), fanning each
-	// completed result out to every listener. Touches fixtures only through
-	// the IFixtureVirtual shim - never sees a concrete adapter/fixture type.
+	// Precompiled, non-template - same bucket as FixtureRegistry/IHadesListener.
+	// Loops over its queued tests in declaration order (no dependency DAG -
+	// order of appearance is execution order), fanning each completed result
+	// out to every listener. Touches fixtures only through the
+	// IFixtureVirtual shim - never sees a concrete adapter/fixture type.
 	class HADES_RUNTIME_API SuiteDriver final {
 	public:
 		SuiteDriver(const FixtureRegistry& ro_Registry, std::vector<SuiteTestEntry> v_Tests) noexcept;
@@ -57,4 +57,4 @@ namespace Hades::Runtime {
 		std::vector<SuiteTestEntry> m_tests;
 	};
 
-} // namespace Hades::Runtime
+}

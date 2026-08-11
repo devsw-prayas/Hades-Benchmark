@@ -19,34 +19,27 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
 #pragma once
-#include "HadesCompiler.h"
-
-#if defined(HADES_SHARED)
-#if HADES_COMPILER_MSVC
-#if defined(HADES_BUILDING_RUNTIME)
-#define HADES_RUNTIME_API __declspec(dllexport)
-#else
-#define HADES_RUNTIME_API __declspec(dllimport)
-#endif
-#elif HADES_COMPILER_CLANG || HADES_COMPILER_GCC
-#define HADES_RUNTIME_API __attribute__((visibility("default")))
-#else
-#define HADES_RUNTIME_API
-#endif
-
-#else
-// Static build -> no import/export
-#define HADES_RUNTIME_API __declspec(dllexport)
-#endif
-
-#include <cstdint>
-#include <type_traits>
-#include <atomic>
-#include <cstddef>
-#include <memory>
-#include <functional>
-#include <cstring>
-#include <cmath>
 #include <cstdio>
-#include <string>
-#include <vector>
+
+// Minimal shared local PASS/FAIL framework for Hades-Codegen-Tests - a
+// deliberate copy of Core/tests/TestFramework.h rather than a cross-project
+// include, keeping each test executable self-contained.
+
+namespace HadesTests {
+
+	inline int& failureCount() {
+		static int s_counter = 0;
+		return s_counter;
+	}
+
+	inline void expectTrueImpl(bool v_Condition, const char* v_Expr, const char* v_File, int v_Line) {
+		if (!v_Condition) {
+			std::printf("  FAIL %s:%d: %s\n", v_File, v_Line, v_Expr);
+			++failureCount();
+		}
+	}
+
+}
+
+#define EXPECT_TRUE(expr) ::HadesTests::expectTrueImpl((expr), #expr, __FILE__, __LINE__)
+#define EXPECT_EQ(a, b)   ::HadesTests::expectTrueImpl((a) == (b), #a " == " #b, __FILE__, __LINE__)

@@ -66,7 +66,7 @@ namespace Hades::Runtime {
 		IHashAccumulator& operator=(IHashAccumulator&&) = delete;
 	};
 
-	class HADES_RUNTIME_API XorHashAccumulator final : public IHashAccumulator<XorHashAccumulator>
+	class XorHashAccumulator final : public IHashAccumulator<XorHashAccumulator>
 	{
 	public:
 		XorHashAccumulator() noexcept
@@ -95,7 +95,7 @@ namespace Hades::Runtime {
 	};
 
 
-	class HADES_RUNTIME_API FnvChainHashAccumulator final
+	class FnvChainHashAccumulator final
 		: public IHashAccumulator<FnvChainHashAccumulator>
 	{
 		static constexpr uint64_t FNV_OFFSET_BASIS = 14695981039346656037ULL;

@@ -18,13 +18,7 @@
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
-// Unit tests for SuiteDriver (Core/src/Public/SuiteDriver.h) - the
-// orchestration class that loops over a suite's queued tests, drives each
-// through FixtureRegistry + IFixtureVirtual, and fans results out to
-// listeners. Uses a trivial hand-written IFixture<D,A> (no HADES_FIXTURE
-// macro exists in code yet - only in the architecture doc's SS1.16
-// pseudocode) registered against NullDeviceAdapter/SteadyClockChronoPoint/
-// XorHashAccumulator, all of which already exist and are instantiable.
+// Unit tests for SuiteDriver (Core/src/Public/SuiteDriver.h).
 
 #include "TestFramework.h"
 
@@ -181,7 +175,7 @@ namespace {
 		}
 	}
 
-} // namespace
+}
 
 void runSuiteDriverTests() {
 	testRunsRegisteredFixture();

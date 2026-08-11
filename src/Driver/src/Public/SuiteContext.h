@@ -19,34 +19,23 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
 #pragma once
-#include "HadesCompiler.h"
-
-#if defined(HADES_SHARED)
-#if HADES_COMPILER_MSVC
-#if defined(HADES_BUILDING_RUNTIME)
-#define HADES_RUNTIME_API __declspec(dllexport)
-#else
-#define HADES_RUNTIME_API __declspec(dllimport)
-#endif
-#elif HADES_COMPILER_CLANG || HADES_COMPILER_GCC
-#define HADES_RUNTIME_API __attribute__((visibility("default")))
-#else
-#define HADES_RUNTIME_API
-#endif
-
-#else
-// Static build -> no import/export
-#define HADES_RUNTIME_API __declspec(dllexport)
-#endif
-
-#include <cstdint>
-#include <type_traits>
-#include <atomic>
-#include <cstddef>
-#include <memory>
-#include <functional>
-#include <cstring>
-#include <cmath>
-#include <cstdio>
 #include <string>
-#include <vector>
+
+// "Adopting" a suite (init-suite/find-suite) writes a small marker file
+// (".hades-suite", one absolute path, in the invocation cwd) that later
+// commands (new-test/run/validate) read back as their implicit suite.
+namespace Hades::Driver {
+
+	inline constexpr const char* SUITE_MARKER_FILE = ".hades-suite";
+
+	// Writes SUITE_MARKER_FILE in the current working directory, pointing at
+	// the absolute, normalized form of v_SuiteDir. Returns false on write failure.
+	bool adoptSuite(const std::string& v_SuiteDir);
+
+	// Reads SUITE_MARKER_FILE from cwd and verifies <dir>/suite.toml still
+	// exists there. Returns false (with a message printed to stderr) if no
+	// suite has been adopted yet, or the adopted directory no longer looks
+	// like a valid suite.
+	bool loadCurrentSuite(std::string& ro_OutSuiteDir);
+
+}

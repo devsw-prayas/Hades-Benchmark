@@ -95,4 +95,4 @@ namespace Hades::Runtime {
         IDeviceAdapter& operator=(IDeviceAdapter&&) = delete;
     };
 
-} // namespace Hades
+}

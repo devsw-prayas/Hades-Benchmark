@@ -53,4 +53,4 @@ namespace Hades::Runtime {
 		}
 	}
 
-} // namespace Hades::Runtime
+}

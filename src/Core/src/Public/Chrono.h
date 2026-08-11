@@ -80,4 +80,4 @@ namespace Hades::Runtime {
         IChronoPoint& operator=(IChronoPoint&&) = delete;
     };
 
-} // namespace Hades
+}

@@ -136,4 +136,4 @@ namespace Hades::Runtime {
 		std::unordered_map<std::string, Entry> m_entries;
 	};
 
-} // namespace Hades::Runtime
+}

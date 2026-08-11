@@ -33,7 +33,7 @@ namespace Hades::Runtime {
 	// Returns false iff ro_OutErrors ends up non-empty; ro_OutTables is still
 	// populated with whatever parsed successfully either way.
 	HADES_NODISCARD_MSG("Parse result must be checked")
-		bool readToml(const std::string& v_Path,
+		HADES_RUNTIME_API bool readToml(const std::string& v_Path,
 		              const std::string& v_ArrayName,
 		              std::vector<TomlTable>& ro_OutTables,
 		              std::vector<TomlParseError>& ro_OutErrors);
@@ -41,7 +41,7 @@ namespace Hades::Runtime {
 	// v_Append = true: opens in append mode and writes only ro_Tables, no read
 	// or re-parse of any existing content. v_Append = false: full rewrite.
 	HADES_NODISCARD_MSG("Write result must be checked")
-		bool writeToml(const std::string& v_Path,
+		HADES_RUNTIME_API bool writeToml(const std::string& v_Path,
 		               const std::string& v_ArrayName,
 		               const std::vector<TomlTable>& ro_Tables,
 		               bool v_Append);
@@ -53,4 +53,4 @@ namespace Hades::Runtime {
 	HADES_NODISCARD const double*      findTomlFloat(const TomlTable& ro_Table, const std::string& v_Key);
 	HADES_NODISCARD const bool*        findTomlBool(const TomlTable& ro_Table, const std::string& v_Key);
 
-} // namespace Hades::Runtime
+}

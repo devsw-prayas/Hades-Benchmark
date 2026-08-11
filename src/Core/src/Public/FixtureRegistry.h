@@ -57,11 +57,8 @@ namespace Hades::Runtime {
 	};
 
 	// Owns both the concrete adapter and the concrete fixture, constructing
-	// each fresh per test (v2->v3 execution model, SS1.2: "construct one
-	// adapter instance; construct one fixture instance ... destroy fixture,
-	// destroy adapter" happens once per queued test, not once per process).
-	// forwards run() to SequentialRunner<D,A,C,H> - a fully static call, no
-	// virtual dispatch past this one boundary.
+	// each fresh per test. Forwards run() to SequentialRunner<D,A,C,H> - a
+	// fully static call, no virtual dispatch past this one boundary.
 	template<typename D, typename A, typename C, typename H>
 	class ConcreteFixtureRunner final : public IFixtureVirtual {
 		using fixture_ = D;
@@ -120,4 +117,4 @@ namespace Hades::Runtime {
 			return std::make_unique<Hades::Runtime::ConcreteFixtureRunner<Name, AdapterType, ChronoType, HashType>>(); \
 		})
 
-} // namespace Hades::Runtime
+}

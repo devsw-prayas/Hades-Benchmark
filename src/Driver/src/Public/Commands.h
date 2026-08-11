@@ -19,34 +19,21 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 */
 #pragma once
-#include "HadesCompiler.h"
-
-#if defined(HADES_SHARED)
-#if HADES_COMPILER_MSVC
-#if defined(HADES_BUILDING_RUNTIME)
-#define HADES_RUNTIME_API __declspec(dllexport)
-#else
-#define HADES_RUNTIME_API __declspec(dllimport)
-#endif
-#elif HADES_COMPILER_CLANG || HADES_COMPILER_GCC
-#define HADES_RUNTIME_API __attribute__((visibility("default")))
-#else
-#define HADES_RUNTIME_API
-#endif
-
-#else
-// Static build -> no import/export
-#define HADES_RUNTIME_API __declspec(dllexport)
-#endif
-
-#include <cstdint>
-#include <type_traits>
-#include <atomic>
-#include <cstddef>
-#include <memory>
-#include <functional>
-#include <cstring>
-#include <cmath>
-#include <cstdio>
 #include <string>
 #include <vector>
+
+// Driver subcommand implementations. Each returns a process exit code:
+// 0 = success, 1 = a step failed (build/parse/write error), 2 = bad usage
+// (missing args, unknown --build backend). Driver's own binary links only
+// Core's config-reading functions + Codegen's writer interface, never
+// SuiteDriver/HadesEngine directly - these functions honor that by
+// construction, since they never touch anything from SuiteDriver.h.
+namespace Hades::Driver {
+
+	int cmdInitSuite(const std::vector<std::string>& v_Args);
+	int cmdFindSuite(const std::vector<std::string>& v_Args);
+	int cmdNewTest(const std::vector<std::string>& v_Args);
+	int cmdRun(const std::vector<std::string>& v_Args);
+	int cmdValidate(const std::vector<std::string>& v_Args);
+
+}

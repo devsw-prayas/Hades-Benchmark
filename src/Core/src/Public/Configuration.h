@@ -134,4 +134,4 @@ namespace Hades::Runtime {
 		HADES_RUNTIME_API bool writeSuiteToml(const std::string& v_Path,
 		                                      const std::vector<SuiteTestEntry>& ro_Tests,
 		                                      bool v_Append);
-} // namespace Hades::Runtime
+}
