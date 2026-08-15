@@ -22,18 +22,9 @@
 #include <HadesCodegen.h>
 #include <CodegenTypes.h>
 
-// Write-only, stateless, ABI-stable across an unknown set of future callers
-// (Driver first, but also e.g. Spectra's SVK tooling directly). Never reads
-// suite.toml/registry.ini itself - Driver/Core have already parsed those and
-// hand over structured ScaffoldRequest/ResolveRequest data. Idempotent:
-// identical input always produces identical output, no side effects beyond
-// the requested writes.
-//
-// Pure-virtual + factory function rather than a directly-exported class so
-// callers can't be assumed to share Codegen's build order. Once shipped,
-// these virtual methods are never reordered or signature-altered. - only appended, or
-// superseded by a future IHadesCodegen2. abiVersion() lets any caller detect
-// what it is actually linked against.
+// Write-only; never reads suite.toml/registry.ini itself, Driver/Core hand over parsed requests.
+// Pure-virtual + factory so callers needn't share Codegen's build order; methods are append-only
+// once shipped (superseded by IHadesCodegen2 if ever broken) - abiVersion() lets callers detect drift.
 namespace Hades::Codegen {
 
 	class HADES_CODEGEN_API IHadesCodegen {

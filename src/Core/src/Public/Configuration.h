@@ -112,19 +112,13 @@ namespace Hades::Runtime {
 		ro_Config.m_FixedSliceCount = v_Count;
 	}
 
-	// One [[test]] entry from suite.toml: the fixture it targets plus its
-	// resolved Config. `fixture` has no home in Config itself (Config is a
-	// pure timing/lifecycle knob set) - this is what ResolveRequest::m_Tests
-	// actually needs to drive Codegen's generated main.cpp registrations.
+	// One [[test]] entry: fixture name + resolved Config; `fixture` has no home in Config itself (pure timing/lifecycle knobs).
 	struct HADES_RUNTIME_API SuiteTestEntry final {
 		std::string m_FixtureName;
 		Config      m_Config;
 	};
 
-	// Calls readToml(v_Path, "test", ...) and maps each resulting TomlTable
-	// onto a SuiteTestEntry via Config's setXxx() functions. `id` and
-	// `fixture` are required; `kind` defaults to Performance if absent;
-	// unknown keys are reported as errors.
+	// `id`/`fixture` required, `kind` defaults to Performance if absent, unknown keys reported as errors.
 	HADES_NODISCARD_MSG("Parse result must be checked")
 		HADES_RUNTIME_API bool readSuiteToml(const std::string& v_Path,
 		                                     std::vector<SuiteTestEntry>& ro_OutTests,

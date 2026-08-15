@@ -25,15 +25,10 @@
 #include <string>
 #include <vector>
 
-// Shared, ABI-neutral request POD types passed across the Codegen boundary.
-// Owned by Core (not Codegen) so that Driver and any external consumer (e.g.
-// Spectra's SVK) can construct these without linking Codegen's DLL first.
-
+// Owned by Core, not Codegen, so Driver/external consumers (e.g. Spectra's SVK) can build these without linking Codegen's DLL.
 namespace Hades::Runtime {
 
-	// One registered fixture, resolved down to the four template arguments
-	// HADES_REGISTER_FIXTURE needs - Codegen never inspects fixture C++ source,
-	// it only ever templates these strings into the generated main.cpp.
+	// Resolved down to the four template args HADES_REGISTER_FIXTURE needs - Codegen never inspects fixture C++ source.
 	struct FixtureEntry final {
 		std::string m_FixtureName;    // C++ class name, e.g. "RwLockContentionFixture"
 		std::string m_HeaderPath;     // #include path for the fixture's own header
@@ -41,18 +36,12 @@ namespace Hades::Runtime {
 		std::string m_ChronoType;     // e.g. "RdtscChronoPoint"
 		std::string m_HashType;       // e.g. "Fnv1aHashAccumulator"
 
-		// Optional: lets a fixture benchmark an external CMake target outside
-		// Hades-Benchmark itself (e.g. one of Spectra's own modules) without
-		// Codegen needing to know anything about it beyond a path + target
-		// name. Both empty (the common case) = no extra dependency. Not a doc
-		// concept - added because nothing else lets the generated suite link
-		// anything but Hades-Core.
+		// Optional: lets a fixture link an external CMake target beyond Hades-Core; both empty = no extra dependency.
 		std::string m_ExtraLinkDir;      // path to the external target's CMakeLists.txt directory
 		std::string m_ExtraLinkTarget;   // its CMake target name
 	};
 
-	// Input to IHadesCodegen::scaffold() - "new-test" subcommand. Describes a
-	// single test being added to the suite currently adopted by Driver.
+	// Input to IHadesCodegen::scaffold() ("new-test"): one test being added to Driver's currently adopted suite.
 	struct ScaffoldRequest final {
 		std::string m_SuiteDir;      // hades-gen/ root
 		std::string m_TestId;        // suite.toml [[test]] id - unique key
@@ -60,9 +49,7 @@ namespace Hades::Runtime {
 		TestKind     m_Kind = TestKind::Performance;
 	};
 
-	// Input to IHadesCodegen::resolve() - "init-suite" subcommand. Describes the
-	// whole suite: every registered fixture plus every test entry already read
-	// out of suite.toml by Core (Codegen never parses toml itself).
+	// Input to IHadesCodegen::resolve() ("init-suite"): every fixture + every test entry already read from suite.toml.
 	struct ResolveRequest final {
 		std::string                    m_SuiteDir;      // hades-gen/ root
 		std::vector<FixtureEntry>      m_Fixtures;       // one #include + registration per entry

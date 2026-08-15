@@ -27,11 +27,7 @@
 
 namespace Hades::Runtime {
 
-	// Reads every [[v_ArrayName]] block in v_Path into ro_OutTables, in file
-	// order. Accumulates every error found rather than bailing on the first
-	// (a future `validate` subcommand wants full diagnostics in one pass).
-	// Returns false iff ro_OutErrors ends up non-empty; ro_OutTables is still
-	// populated with whatever parsed successfully either way.
+	// Reads every [[v_ArrayName]] block in file order; accumulates all errors instead of bailing on the first.
 	HADES_NODISCARD_MSG("Parse result must be checked")
 		HADES_RUNTIME_API bool readToml(const std::string& v_Path,
 		              const std::string& v_ArrayName,

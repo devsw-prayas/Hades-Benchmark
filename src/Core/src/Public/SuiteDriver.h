@@ -32,11 +32,7 @@
 
 namespace Hades::Runtime {
 
-	// Precompiled, non-template - same bucket as FixtureRegistry/IHadesListener.
-	// Loops over its queued tests in declaration order (no dependency DAG -
-	// order of appearance is execution order), fanning each completed result
-	// out to every listener. Touches fixtures only through the
-	// IFixtureVirtual shim - never sees a concrete adapter/fixture type.
+	// Runs queued tests in declaration order, fanning each result out to every listener via the IFixtureVirtual shim.
 	class HADES_RUNTIME_API SuiteDriver final {
 	public:
 		SuiteDriver(const FixtureRegistry& ro_Registry, std::vector<SuiteTestEntry> v_Tests) noexcept;
@@ -47,9 +43,7 @@ namespace Hades::Runtime {
 		SuiteDriver(SuiteDriver&&) = delete;
 		SuiteDriver& operator=(SuiteDriver&&) = delete;
 
-		// An unknown fixture name produces a synthesized runFailed
-		// BenchmarkResult rather than crashing the suite - one typo in
-		// suite.toml shouldn't take down every other test.
+		// An unknown fixture name synthesizes a runFailed result instead of crashing the whole suite.
 		void run(const std::vector<IHadesListener*>& ro_Listeners) const;
 
 	private:

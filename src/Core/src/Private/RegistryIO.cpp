@@ -39,12 +39,7 @@ namespace Hades::Runtime {
 		return true;
 	}
 
-	// Catches an empty field, a header path pasted into the wrong key, or a
-	// stray character typo before it reaches the generated main.cpp - those
-	// currently surface as a wall of MSVC template-instantiation errors
-	// pointing at generated code the user never wrote. Cannot catch a name
-	// that collides with an unrelated macro/symbol pulled in by some other
-	// header - that's only knowable to the real compiler.
+	// Catches an empty/mistyped field before it becomes a wall of MSVC errors in generated code the user never wrote.
 	bool isCppTypeName(const std::string& ro_Text) {
 		if (ro_Text.empty()) {
 			return false;

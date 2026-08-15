@@ -22,12 +22,7 @@
 #include <string>
 #include <vector>
 
-// Driver subcommand implementations. Each returns a process exit code:
-// 0 = success, 1 = a step failed (build/parse/write error), 2 = bad usage
-// (missing args, unknown --build backend). Driver's own binary links only
-// Core's config-reading functions + Codegen's writer interface, never
-// SuiteDriver/HadesEngine directly - these functions honor that by
-// construction, since they never touch anything from SuiteDriver.h.
+// Exit codes: 0 = success, 1 = step failed (build/parse/write), 2 = bad usage.
 namespace Hades::Driver {
 
 	int cmdInitSuite(const std::vector<std::string>& v_Args);

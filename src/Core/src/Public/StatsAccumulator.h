@@ -70,11 +70,7 @@ namespace Hades::Runtime {
 		}
 	};
 
-	// Rolling-window baseline for jitter detection. Under SequentialRunner there
-	// is no cross-thread median to compare a slice against (v2's approach), so
-	// outlier detection instead compares each slice against the median of the
-	// last JITTER_WINDOW *accepted* slices. Below the minimum sample count there
-	// is no baseline yet, so slices are accepted unconditionally.
+	// Compares each slice against the median of the last JITTER_WINDOW accepted slices (no cross-thread median anymore).
 	static constexpr uint32_t JITTER_WINDOW = 8;
 	static constexpr uint32_t JITTER_WINDOW_MIN_SAMPLES = 3;
 
@@ -153,12 +149,9 @@ namespace Hades::Runtime {
 		StatsAccumulator(StatsAccumulator&&) = delete;
 		StatsAccumulator& operator=(StatsAccumulator&&) = delete;
 
-		// Called once after the calibration slice to derive stopping knobs.
-		// v_CalibrationWallTime is the cpu wall time of the calibration slice.
-		// v_ConfigKnobs contains any user-provided overrides (0 = use derived).
+		// Derives stopping knobs from the calibration slice; ro_ConfigKnobs' non-zero fields override the derived defaults.
 		void deriveKnobs(double v_CalibrationWallTime, const StoppingKnobs& ro_ConfigKnobs) noexcept {
-			// Derive defaults from calibration wall time
-			// Faster fixtures need more slices to converge; scale floor accordingly
+			// Faster fixtures need more slices to converge; scale floor accordingly.
 			if (v_CalibrationWallTime < 1e-4) {
 				m_knobs.minSlices = 30;
 				m_knobs.maxSlices = 500;

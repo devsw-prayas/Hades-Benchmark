@@ -33,9 +33,7 @@
 
 namespace Hades::Runtime {
 
-	// Three independent taps on the same immutable completed result - none
-	// feeds another. Modeled on gtest's TestEventListener, not lit's raw text
-	// capture, since Hades already produces a typed BenchmarkResult.
+	// Independent taps on the same immutable result, modeled on gtest's TestEventListener rather than lit's raw text.
 	class IHadesListener {
 	public:
 		virtual ~IHadesListener() = default;
@@ -53,10 +51,7 @@ namespace Hades::Runtime {
 		IHadesListener() = default;
 	};
 
-	// SuiteDriver is fully precompiled and cannot template on arbitrary
-	// listener types (same constraint that forces IFixtureVirtual). Wraps a
-	// plain duck-typed listener in the stable vtable at the call site -
-	// instantiation is cheap, entirely outside the hot path.
+	// Wraps a duck-typed listener in a stable vtable, since precompiled SuiteDriver can't template on listener type.
 	template<typename T>
 	class ListenerSupport final : public IHadesListener {
 		T& m_wrapped;
@@ -70,10 +65,7 @@ namespace Hades::Runtime {
 		void onSuiteComplete() override { m_wrapped.onSuiteComplete(); }
 	};
 
-	// Human-readable pass/fail + summary stats to stdout. "Failed" here means
-	// the run itself broke (discard caps exceeded or non-deterministic output) -
-	// statistical regression severity (Regressed/Degraded) is RegressionListener's
-	// concern, a separate tap on the same result, not decided here.
+	// "Failed" here means the run itself broke; statistical regression severity is RegressionListener's separate concern.
 	class HADES_RUNTIME_API ConsoleListener final {
 	public:
 		void onTestStart(const std::string& v_Id) noexcept {
@@ -100,9 +92,7 @@ namespace Hades::Runtime {
 		}
 	};
 
-	// Forwards each completed result to an IStorageBackend<D>. Storage is
-	// the backend's own concern (memory, JSON, ...) - this listener is just
-	// the wiring between the fan-out and store().
+	// Just the wiring between the fan-out and IStorageBackend<D>::store() - storage format is the backend's own concern.
 	template<typename D>
 	class StorageListener final {
 		using backend_ = IStorageBackend<D>;
@@ -120,11 +110,7 @@ namespace Hades::Runtime {
 		void onSuiteComplete() noexcept {}
 	};
 
-	// Forwards each completed result to RegressionAnalyzer::evaluate() and
-	// tracks the worst outcome seen across the suite. Failed > Degraded >
-	// Regressed > Pass - kept as distinct severities on purpose, per
-	// RegressionAnalyzer; collapsing them here would force the caller to
-	// re-derive the distinction from raw divergence ratios.
+	// Tracks the worst outcome across the suite; Failed > Degraded > Regressed > Pass kept distinct per RegressionAnalyzer.
 	template<typename H>
 	class RegressionListener final {
 		using analyzer_ = RegressionAnalyzer<H>;

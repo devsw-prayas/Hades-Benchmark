@@ -26,12 +26,7 @@
 #include <string>
 #include <vector>
 
-// registry.ini's grammar, defined here since Driver's resolve()/scaffold()
-// calls have no other source for the FixtureEntry list. Flat ini: repeated
-// "[FixtureName]" sections, each with
-// exactly four required string keys mapping 1:1 onto FixtureEntry. Every
-// value is a bare string (a C++ type name or path token) - unlike TomlIO's
-// grammar, there is no typed value model to parse here.
+// registry.ini grammar: repeated "[FixtureName]" sections, four required bare-string keys each, no typed value model.
 namespace Hades::Runtime {
 
 	struct RegistryIniError final {
@@ -43,24 +38,17 @@ namespace Hades::Runtime {
 	HADES_NODISCARD_MSG("Validity check result must be checked")
 		HADES_RUNTIME_API bool isIdentifier(const std::string& ro_Text);
 
-	// One or more isIdentifier() segments joined by "::" - what registry.ini's
-	// adapter/chrono/hash fields are expected to hold. Shared by readRegistryIni
-	// (parse time) and Driver's new-test (scaffold time) so a bad type name is
-	// rejected once, consistently, in both places it can first appear.
+	// isIdentifier() segments joined by "::"; shared by parse-time and scaffold-time so a bad type name is rejected consistently.
 	HADES_NODISCARD_MSG("Validity check result must be checked")
 		HADES_RUNTIME_API bool isCppTypeName(const std::string& ro_Text);
 
-	// Accumulates every error found rather than bailing on the first (same
-	// convention as readToml) - a future `validate` subcommand wants full
-	// diagnostics in one pass.
+	// Accumulates every error instead of bailing on the first, for a future `validate` subcommand's full diagnostics.
 	HADES_NODISCARD_MSG("Parse result must be checked")
 		HADES_RUNTIME_API bool readRegistryIni(const std::string& v_Path,
 		                      std::vector<FixtureEntry>& ro_OutFixtures,
 		                      std::vector<RegistryIniError>& ro_OutErrors);
 
-	// v_Append = true: opens in append mode and writes only ro_Fixtures, no
-	// read or re-parse of any existing content - matching writeToml's
-	// convention (Configuration.h's writeSuiteToml, TomlIO.h's writeToml).
+	// v_Append = true writes only ro_Fixtures in append mode, no read/re-parse of existing content.
 	HADES_NODISCARD_MSG("Write result must be checked")
 		HADES_RUNTIME_API bool writeRegistryIni(const std::string& v_Path,
 		                       const std::vector<FixtureEntry>& ro_Fixtures,

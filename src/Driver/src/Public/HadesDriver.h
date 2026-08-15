@@ -24,10 +24,7 @@
 #include <vector>
 #include <memory>
 
-// HADES_VERSION is supplied by the top-level CMakeLists.txt as a compile
-// definition (--version prints the MAJOR.MINOR.REVISION triplet) - the
-// fallback here only matters for stray standalone compiles (e.g. IDE syntax
-// checking) outside the real build.
+// Real value comes from CMakeLists.txt; fallback only matters for stray standalone compiles (IDE syntax checking).
 #ifndef HADES_VERSION
 #define HADES_VERSION "0.0.0-dev"
 #endif

@@ -26,6 +26,7 @@
 #include <CodegenInterface.h>
 #include <RegistryIO.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -54,10 +55,151 @@ namespace Hades::Driver {
 			return l_name.empty() ? "hades_suite" : l_name;
 		}
 
-		// Re-derives the generated main.cpp/CMakeLists.txt from the suite's
-		// current registry.ini + suite.toml - the single source of truth
-		// `run`/`validate` regenerate from immediately before building, so
-		// `new-test` doesn't need to duplicate this logic itself.
+		// Mirrors generated main.cpp's own wildcardMatch() so --isolate can pre-filter locally instead of spawning-then-discarding.
+		bool wildcardMatch(const std::string& v_Pattern, const std::string& v_Text) {
+			size_t l_p = 0, l_t = 0, l_star = std::string::npos, l_mark = 0;
+			while (l_t < v_Text.size()) {
+				if (l_p < v_Pattern.size() && v_Pattern[l_p] == v_Text[l_t]) {
+					++l_p; ++l_t;
+				} else if (l_p < v_Pattern.size() && v_Pattern[l_p] == '*') {
+					l_star = l_p++;
+					l_mark = l_t;
+				} else if (l_star != std::string::npos) {
+					l_p = l_star + 1;
+					l_t = ++l_mark;
+				} else {
+					return false;
+				}
+			}
+			while (l_p < v_Pattern.size() && v_Pattern[l_p] == '*') {
+				++l_p;
+			}
+			return l_p == v_Pattern.size();
+		}
+
+		// `run --isolate` result for one fixture, printed after its subprocess
+		// finishes and collected into the end-of-run summary.
+		struct IsolatedOutcome final {
+			std::string m_Id;
+			bool        m_Passed = false;
+			bool        m_TimedOut = false;
+			int         m_ExitCode = 0;
+		};
+
+		// Redraws the progress line in place (\r, no \n); v_ClearWidth blanks leftover tail chars from a shorter redraw.
+		void drawProgressBar(size_t v_Done, size_t v_Total, size_t v_Failed, size_t& ro_ClearWidth) {
+			constexpr size_t BAR_WIDTH = 20;
+			const size_t l_filled = (v_Total == 0) ? 0 : (v_Done * BAR_WIDTH) / v_Total;
+
+			std::string l_line = "Testing: " + std::to_string(v_Done) + "/" + std::to_string(v_Total);
+			if (v_Failed > 0) {
+				l_line += " (" + std::to_string(v_Failed) + " failed)";
+			}
+			l_line += " [";
+			l_line += std::string(l_filled, '=');
+			if (l_filled < BAR_WIDTH) {
+				l_line += '>';
+				l_line += std::string(BAR_WIDTH - l_filled - 1, ' ');
+			}
+			l_line += "]";
+
+			std::cout << '\r' << l_line;
+			if (l_line.size() < ro_ClearWidth) {
+				std::cout << std::string(ro_ClearWidth - l_line.size(), ' ');
+			}
+			ro_ClearWidth = l_line.size();
+			std::cout.flush();
+		}
+
+		// Mirrors lit's "only show output for failures" - dumps runProcessTimed()'s capture file indented below the bar.
+		void dumpCaptured(const std::string& v_CaptureFilePath) {
+			std::ifstream l_file(v_CaptureFilePath, std::ios::binary);
+			if (!l_file.is_open()) {
+				return;
+			}
+			std::string l_line;
+			while (std::getline(l_file, l_line)) {
+				std::cout << "    " << l_line << "\n";
+			}
+		}
+
+		int cmdRunIsolate(const std::string& v_SuiteDir, const std::string& v_ExePath,
+		                   const std::string& v_Fbt, const std::string& v_Format, unsigned v_TimeoutSeconds) {
+			std::vector<Hades::Runtime::SuiteTestEntry> l_tests;
+			std::vector<Hades::Runtime::TomlParseError> l_tomlErrors;
+			if (!Hades::Runtime::readSuiteToml(v_SuiteDir + "/suite.toml", l_tests, l_tomlErrors)) {
+				std::cerr << "error: could not read suite.toml for --isolate\n";
+				return 1;
+			}
+
+			std::vector<std::string> l_ids;
+			for (const Hades::Runtime::SuiteTestEntry& r_test : l_tests) {
+				if (v_Fbt.empty() || wildcardMatch(v_Fbt, r_test.m_Config.m_Id)) {
+					l_ids.push_back(r_test.m_Config.m_Id);
+				}
+			}
+			if (l_ids.empty()) {
+				std::cerr << "error: --fbt='" << v_Fbt << "' matched no fixtures\n";
+				return 1;
+			}
+
+			const std::string l_captureFilePath = v_SuiteDir + "/generated/.isolate_capture.txt";
+
+			std::vector<IsolatedOutcome> l_outcomes;
+			l_outcomes.reserve(l_ids.size());
+			size_t l_failedCount = 0;
+			size_t l_clearWidth = 0;
+
+			for (size_t l_i = 0; l_i < l_ids.size(); ++l_i) {
+				const std::string& r_id = l_ids[l_i];
+				drawProgressBar(l_i, l_ids.size(), l_failedCount, l_clearWidth);
+
+				std::string l_cmd = quotePath(v_ExePath) + " --fbt=" + r_id + " --format=" + v_Format;
+				const ProcessResult l_result = runProcessTimed(l_cmd, v_TimeoutSeconds, l_captureFilePath);
+
+				IsolatedOutcome l_outcome;
+				l_outcome.m_Id = r_id;
+				l_outcome.m_TimedOut = l_result.m_TimedOut;
+				l_outcome.m_ExitCode = l_result.m_ExitCode;
+				l_outcome.m_Passed = !l_result.m_TimedOut && l_result.m_ExitCode == 0;
+
+				if (!l_outcome.m_Passed) {
+					++l_failedCount;
+					std::cout << '\r' << std::string(l_clearWidth, ' ') << '\r';
+					if (l_outcome.m_TimedOut) {
+						std::cout << "FAIL: " << r_id << " (timed out after " << v_TimeoutSeconds << "s)\n";
+					} else {
+						std::cout << "FAIL: " << r_id << " (exit " << l_result.m_ExitCode << ")\n";
+					}
+					dumpCaptured(l_captureFilePath);
+					l_clearWidth = 0;
+				}
+				l_outcomes.push_back(std::move(l_outcome));
+			}
+
+			drawProgressBar(l_ids.size(), l_ids.size(), l_failedCount, l_clearWidth);
+			std::cout << "\n";
+
+			std::error_code l_ec;
+			fs::remove(l_captureFilePath, l_ec);
+
+			const size_t l_passCount = l_outcomes.size() - l_failedCount;
+			std::cout << l_passCount << "/" << l_outcomes.size() << " passed\n";
+			if (l_failedCount != 0) {
+				std::cout << "failed:\n";
+				for (const IsolatedOutcome& r_outcome : l_outcomes) {
+					if (r_outcome.m_Passed) {
+						continue;
+					}
+					std::cout << "  " << r_outcome.m_Id << " - "
+						<< (r_outcome.m_TimedOut ? "timeout" : "exit " + std::to_string(r_outcome.m_ExitCode)) << "\n";
+				}
+				return 1;
+			}
+			return 0;
+		}
+
+		// Re-derives main.cpp/CMakeLists.txt from registry.ini+suite.toml; `run`/`validate` call this so `new-test` needn't duplicate it.
 		bool regenerateSuite(const std::string& v_SuiteDir, std::string& ro_OutError) {
 			std::vector<Hades::Runtime::FixtureEntry> l_fixtures;
 			std::vector<Hades::Runtime::RegistryIniError> l_regErrors;
@@ -108,9 +250,7 @@ namespace Hades::Driver {
 			return "";
 		}
 
-		// `run --build=cmake` is the only backend actually wired up - Codegen
-		// only ever emits a CMakeLists.txt, and `direct`/`ninja` have no
-		// generator counterpart yet.
+		// `cmake` is the only --build backend wired up - `direct`/`ninja` have no generator counterpart yet.
 		int runCMakeConfigure(const std::string& v_GenDir, const std::string& v_BuildDir) {
 			const std::string l_cmd = "cmake -S " + quotePath(v_GenDir) +
 				" -B " + quotePath(v_BuildDir) +
@@ -317,13 +457,23 @@ namespace Hades::Driver {
 	}
 
 	int cmdRun(const std::vector<std::string>& v_Args) {
-		std::string l_build = "cmake", l_fbt, l_format = "console";
+		std::string l_build = "cmake", l_fbt, l_format = "console", l_timeoutStr;
+		bool l_isolate = false;
 		for (const std::string& r_arg : v_Args) {
 			std::string l_value;
-			if (parseFlag(r_arg, "build", l_value))  { l_build = l_value;  continue; }
-			if (parseFlag(r_arg, "fbt", l_value))    { l_fbt = l_value;   continue; }
-			if (parseFlag(r_arg, "format", l_value)) { l_format = l_value; continue; }
+			if (parseFlag(r_arg, "build", l_value))    { l_build = l_value;   continue; }
+			if (parseFlag(r_arg, "fbt", l_value))      { l_fbt = l_value;    continue; }
+			if (parseFlag(r_arg, "format", l_value))   { l_format = l_value; continue; }
+			if (parseFlag(r_arg, "timeout", l_value))  { l_timeoutStr = l_value; continue; }
+			if (r_arg == "--isolate") { l_isolate = true;  continue; }
+			if (r_arg == "--native")  { l_isolate = false; continue; }
 			std::cerr << "warning: unrecognized flag '" << r_arg << "'\n";
+		}
+		// 15s default mirrors the manual `timeout 15` wrapper this replaces
+		// (see project_hades_unittest_generation_pipeline.md's isolation runs).
+		unsigned l_timeoutSeconds = 15;
+		if (!l_timeoutStr.empty()) {
+			l_timeoutSeconds = static_cast<unsigned>(std::strtoul(l_timeoutStr.c_str(), nullptr, 10));
 		}
 		if (l_build != "cmake") {
 			std::cerr << "error: --build=" << l_build << " is not yet implemented (only 'cmake' is supported)\n";
@@ -356,6 +506,10 @@ namespace Hades::Driver {
 		if (l_exePath.empty()) {
 			std::cerr << "error: could not locate the built suite executable under '" << l_buildDir << "'\n";
 			return 1;
+		}
+
+		if (l_isolate) {
+			return cmdRunIsolate(l_suiteDir, l_exePath, l_fbt, l_format, l_timeoutSeconds);
 		}
 
 		std::string l_cmd = quotePath(l_exePath);

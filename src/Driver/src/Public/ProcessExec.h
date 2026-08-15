@@ -21,21 +21,22 @@
 #pragma once
 #include <string>
 
-// Driver's own binary never links HadesEngine/SuiteDriver - it only ever
-// shells out: to cmake (configure/build the Codegen-generated suite) and to
-// the generated suite binary itself (the CTest-style subprocess model).
-// std::system() is the whole implementation - a dev CLI tool doesn't need a
-// hand-rolled CreateProcess/fork+exec wrapper.
+// Driver only ever shells out (cmake, generated suite binary) - never links HadesEngine/SuiteDriver directly.
 namespace Hades::Driver {
 
-	// Wraps v_Path in double quotes if it contains a space and isn't already
-	// quoted - every path handed to std::system() needs this (repo paths in
-	// this project routinely contain spaces, e.g. "Graphics Programming").
+	// Quotes v_Path if it has spaces and isn't already quoted - required before handing paths to std::system().
 	std::string quotePath(const std::string& v_Path);
 
-	// Runs v_Command via std::system() with stdio inherited from this process.
-	// Returns the child's exit code (platform-native semantics - the same
-	// value std::system() itself returns on this platform).
+	// std::system() wrapper; returns the child's platform-native exit code.
 	int runProcess(const std::string& v_Command);
+
+	struct ProcessResult final {
+		int  m_ExitCode = 0;
+		bool m_TimedOut = false;
+	};
+
+	// Redirects child stdout/stderr to v_CaptureFilePath so it doesn't interleave with the isolate progress bar;
+	// kills the child past v_TimeoutSeconds (0 = no timeout), leaving m_ExitCode at default since it's meaningless post-TerminateProcess.
+	ProcessResult runProcessTimed(const std::string& v_Command, unsigned v_TimeoutSeconds, const std::string& v_CaptureFilePath);
 
 }

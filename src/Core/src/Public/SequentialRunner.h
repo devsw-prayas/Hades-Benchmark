@@ -36,11 +36,7 @@
 
 namespace Hades::Runtime {
 
-	// v2's CyclicBarrier synchronized two threads across an epoch boundary.
-	// SequentialRunner drives exactly one adapter/fixture pair, so there is
-	// nothing left to actually barrier on - this exists only to preserve the
-	// seq_cst fence v2 relied on at the same call sites (host writes visible
-	// before a GPU kernel launch, device writes visible before a host read).
+	// Preserves the seq_cst fence v2's CyclicBarrier relied on, without an actual barrier (only one thread now).
 	class CompletionFence final {
 	public:
 		CompletionFence() = delete;
@@ -50,14 +46,8 @@ namespace Hades::Runtime {
 		}
 	};
 
-	// Drives one IFixture<D,A> through its full measurement lifecycle:
-	// startup -> warmup -> calibration -> CV-converging slice loop -> teardown.
-	// Zero virtual dispatch - D, A, C, H are all resolved at compile time.
-	//
-	// Caller constructs ro_Fixture/ro_Adapter (adapter injected into fixture at
-	// construction, per IFixture<D,A>::IFixture(A&)) and owns their lifetime for
-	// the duration of run(). Iterating multiple queued tests, and construct/
-	// destroy per test, is SuiteDriver's job - SequentialRunner runs exactly one.
+	// Drives one IFixture<D,A> through startup->warmup->calibration->CV-converging slice loop->teardown, zero virtual dispatch.
+	// Caller owns ro_Fixture/ro_Adapter lifetime for run(); iterating/constructing per queued test is SuiteDriver's job.
 	template<typename D, typename A, typename C, typename H>
 	class SequentialRunner final {
 		using fixture_ = D;
@@ -148,11 +138,8 @@ namespace Hades::Runtime {
 		}
 
 	private:
-		// TestKind::Correctness: execute() called exactly once (no warmup, no
-		// calibration, no CV-converging slice loop) - Pass/Failed only. There
-		// is no reference hash to diverge from on a single call, so the run is
-		// trivially deterministic; a fixture that wants a real correctness
-		// check asserts/traps inside executeImpl() itself.
+		// Correctness kind: execute() runs once, trivially deterministic (no reference hash to diverge from) -
+		// a real correctness check is the fixture's own assert/trap inside executeImpl().
 		template<typename T>
 		HADES_NODISCARD_MSG("Cannot discard benchmark result")
 			static BenchmarkResult internalRunCorrectnessOnce(
@@ -184,10 +171,7 @@ namespace Hades::Runtime {
 			return result;
 		}
 
-		// Config.m_Iterations == 0 ("calibration-derived") resolves to a single
-		// execute() call per slice - deriveKnobs already scales min/max slice
-		// counts for sub-100us fixtures, so noise is absorbed by taking more
-		// slices rather than inflating the per-slice iteration count.
+		// 0 ("calibration-derived") -> 1 execute()/slice; deriveKnobs absorbs sub-100us noise via more slices, not bigger ones.
 		HADES_NODISCARD_MSG("Cannot discard resolved iteration count")
 			static uint64_t internalResolveIterationsPerSlice(const Config& ro_Config) noexcept {
 			return (ro_Config.m_Iterations > 0) ? ro_Config.m_Iterations : 1;

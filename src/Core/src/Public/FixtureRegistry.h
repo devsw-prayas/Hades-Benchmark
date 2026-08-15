@@ -36,10 +36,7 @@
 
 namespace Hades::Runtime {
 
-	// The one deliberate virtual shim in the entire architecture. Orchestration-
-	// time dispatch only: SuiteDriver makes exactly one virtual call per test
-	// (run()) - everything inside it (SequentialRunner's slice loop) is fully
-	// static/CRTP with zero further virtual dispatch.
+	// The one deliberate virtual shim: SuiteDriver makes one virtual call per test, everything past it is static/CRTP.
 	class IFixtureVirtual {
 	public:
 		virtual ~IFixtureVirtual() = default;
@@ -56,9 +53,7 @@ namespace Hades::Runtime {
 		IFixtureVirtual() = default;
 	};
 
-	// Owns both the concrete adapter and the concrete fixture, constructing
-	// each fresh per test. Forwards run() to SequentialRunner<D,A,C,H> - a
-	// fully static call, no virtual dispatch past this one boundary.
+	// Owns adapter+fixture, fresh per test; forwards run() to SequentialRunner<D,A,C,H> as a fully static call.
 	template<typename D, typename A, typename C, typename H>
 	class ConcreteFixtureRunner final : public IFixtureVirtual {
 		using fixture_ = D;
@@ -81,16 +76,10 @@ namespace Hades::Runtime {
 		fixture_ m_fixture;
 	};
 
-	// Explicit bootstrap registry - never static-init auto-registration
-	// (init-order-across-TUs landmine). Fully precompiled: no CRTP constraint,
-	// touches fixtures only through the IFixtureVirtual shim.
+	// Explicit bootstrap registry, never static-init auto-registration (avoids the init-order-across-TUs landmine).
 	class HADES_RUNTIME_API FixtureRegistry final {
 	public:
-		// Zero-argument and self-contained: the only place that ever knows the
-		// concrete AdapterType is the HADES_REGISTER_FIXTURE call site itself
-		// (in generated, per-suite code), so the factory closure constructs its
-		// own adapter+fixture pair rather than requiring a caller (SuiteDriver)
-		// that is deliberately adapter-type-agnostic to construct one first.
+		// Zero-arg: the factory closure builds its own adapter+fixture, since only the HADES_REGISTER_FIXTURE call site knows AdapterType.
 		using FactoryFn = std::function<std::unique_ptr<IFixtureVirtual>()>;
 
 		FixtureRegistry() = default;

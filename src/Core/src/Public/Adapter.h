@@ -27,11 +27,7 @@
 
 namespace Hades::Runtime {
 
-    // Common polymorphic base for concrete adapters (NullDeviceAdapter,
-    // CudaDeviceAdapter, ...). Exists solely so FixtureRegistry's factory can
-    // pass a type-erased adapter reference across the orchestration boundary
-    // and recover the concrete type with a single static_cast at construction
-    // time - never used for virtual dispatch inside the measurement path.
+    // Lets FixtureRegistry's factory pass a type-erased adapter reference and recover it via static_cast - never used for dispatch.
     class IDeviceAdapterBase {
     public:
         virtual ~IDeviceAdapterBase() = default;

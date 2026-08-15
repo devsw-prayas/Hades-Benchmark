@@ -28,21 +28,13 @@ namespace Hades::Driver {
 
 	inline constexpr const char* SUITE_MARKER_FILE = ".hades-suite";
 
-	// Writes SUITE_MARKER_FILE in the current working directory, pointing at
-	// the absolute, normalized form of v_SuiteDir. Returns false on write failure.
+	// Writes SUITE_MARKER_FILE in cwd, pointing at v_SuiteDir's absolute normalized form.
 	bool adoptSuite(const std::string& v_SuiteDir);
 
-	// Reads SUITE_MARKER_FILE from cwd and verifies <dir>/suite.toml still
-	// exists there. Returns false (with a message printed to stderr) if no
-	// suite has been adopted yet, or the adopted directory no longer looks
-	// like a valid suite.
+	// Reads SUITE_MARKER_FILE from cwd; false if unadopted or <dir>/suite.toml is missing.
 	bool loadCurrentSuite(std::string& ro_OutSuiteDir);
 
-	// If SUITE_MARKER_FILE in cwd currently points at v_SuiteDir (compared by
-	// absolute path), deletes the marker - so removing the adopted suite
-	// doesn't leave 'find-suite'/'run'/etc. pointing at a directory that no
-	// longer exists. A no-op (not an error) if no suite is adopted, or the
-	// adopted one is a different directory.
+	// Deletes the marker if it currently points at v_SuiteDir; no-op otherwise (not an error).
 	void clearSuiteIfCurrent(const std::string& v_SuiteDir);
 
 }
