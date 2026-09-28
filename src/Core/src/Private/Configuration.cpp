@@ -158,7 +158,8 @@ namespace Hades::Runtime {
 		ro_OutTests.clear();
 
 		std::vector<TomlTable> l_tables;
-		readToml(v_Path, "test", l_tables, ro_OutErrors);
+		// Failures land in ro_OutErrors; keep mapping whatever parsed so every error is reported.
+		static_cast<void>(readToml(v_Path, "test", l_tables, ro_OutErrors));
 
 		for (size_t l_i = 0; l_i < l_tables.size(); ++l_i) {
 			SuiteTestEntry l_entry;

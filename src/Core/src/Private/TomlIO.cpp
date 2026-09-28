@@ -30,8 +30,18 @@ namespace Hades::Runtime {
 
 	namespace {
 
+		// fopen_s on the MSVC CRT, where plain fopen is flagged deprecated (C4996).
+		std::FILE* openFile(const std::string& v_Path, const char* p_Mode) {
+#if defined(_MSC_VER)
+			std::FILE* l_file = nullptr;
+			return fopen_s(&l_file, v_Path.c_str(), p_Mode) == 0 ? l_file : nullptr;
+#else
+			return std::fopen(v_Path.c_str(), p_Mode);
+#endif
+		}
+
 		bool readWholeFile(const std::string& v_Path, std::string& ro_OutContent) {
-			std::FILE* l_file = std::fopen(v_Path.c_str(), "rb");
+			std::FILE* l_file = openFile(v_Path, "rb");
 			if (l_file == nullptr) {
 				return false;
 			}
@@ -55,7 +65,7 @@ namespace Hades::Runtime {
 		}
 
 		bool writeWholeFile(const std::string& v_Path, const std::string& ro_Content, bool v_Append) {
-			std::FILE* l_file = std::fopen(v_Path.c_str(), v_Append ? "ab" : "wb");
+			std::FILE* l_file = openFile(v_Path, v_Append ? "ab" : "wb");
 			if (l_file == nullptr) {
 				return false;
 			}

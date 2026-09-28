@@ -35,8 +35,8 @@ target_precompile_headers(Hades-Core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/Pub
 set_target_properties(Hades-Core PROPERTIES FOLDER "Reflection")
 
 target_compile_options(Hades-Core PRIVATE
-    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/arch:AVX2 /W4 /permissive->
-    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-mavx2 -Wall -Wextra>
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>:/arch:AVX2 /W4 /permissive->
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>>:-mavx2 -Wall -Wextra>
 )
 
 if(HADES_ENABLE_CUDA)

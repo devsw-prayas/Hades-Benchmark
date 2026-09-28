@@ -27,14 +27,14 @@
 #include <vector>
 
 namespace Hades::Runtime {
-	enum class HADES_RUNTIME_API ChronoBackend : uint8_t {
+	enum class ChronoBackend : uint8_t {
 		Rdtsc,         // RdtscChronoPoint    - lowest overhead, rdtsc/rdtscp
 		SteadyClock,   // SteadyClockChronoPoint - portable, frequency-scaling immune
 	};
 
 	// kind = "performance" (default) or "correctness" in suite.toml - explicit,
 	// never inferred from the fixture's C++ type.
-	enum class HADES_RUNTIME_API TestKind : uint8_t {
+	enum class TestKind : uint8_t {
 		Performance,   // full lifecycle, CV-converging slice loop, Pass/Regressed/Degraded/Failed
 		Correctness,   // execute() called exactly once, Pass/Failed only
 	};
