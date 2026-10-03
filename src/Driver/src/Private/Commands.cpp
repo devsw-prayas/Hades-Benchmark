@@ -50,6 +50,10 @@ namespace Hades::Driver {
 			return false;
 		}
 
+		bool isKnownCMakeConfig(const std::string& v_Config) {
+			return v_Config == "Debug" || v_Config == "Release" || v_Config == "RelWithDebInfo";
+		}
+
 		std::string suiteExecutableName(const std::string& v_SuiteDir) {
 			const std::string l_name = fs::path(v_SuiteDir).filename().string();
 			return l_name.empty() ? "hades_suite" : l_name;
@@ -234,8 +238,13 @@ namespace Hades::Driver {
 			return true;
 		}
 
-		std::string findGeneratedExecutable(const std::string& v_BuildDir, const std::string& v_Name) {
+		// v_Config's own subfolder (matching what --config built) is checked first so a
+		// stale exe left over from an earlier build in a different config is never picked
+		// up by mistake - the trailing candidates are just a fallback for generators that
+		// don't use per-config subfolders at all.
+		std::string findGeneratedExecutable(const std::string& v_BuildDir, const std::string& v_Name, const std::string& v_Config) {
 			const std::string l_candidates[] = {
+				v_BuildDir + "/" + v_Config + "/" + v_Name + ".exe",
 				v_BuildDir + "/" + v_Name + ".exe",
 				v_BuildDir + "/" + v_Name,
 				v_BuildDir + "/Debug/" + v_Name + ".exe",
@@ -258,8 +267,8 @@ namespace Hades::Driver {
 			return runProcess(l_cmd);
 		}
 
-		int runCMakeBuild(const std::string& v_BuildDir) {
-			return runProcess("cmake --build " + quotePath(v_BuildDir) + " --config Debug");
+		int runCMakeBuild(const std::string& v_BuildDir, const std::string& v_Config) {
+			return runProcess("cmake --build " + quotePath(v_BuildDir) + " --config " + v_Config);
 		}
 
 	}
@@ -457,7 +466,7 @@ namespace Hades::Driver {
 	}
 
 	int cmdRun(const std::vector<std::string>& v_Args) {
-		std::string l_build = "cmake", l_fbt, l_format = "console", l_timeoutStr;
+		std::string l_build = "cmake", l_fbt, l_format = "console", l_timeoutStr, l_config = "Debug";
 		bool l_isolate = false;
 		for (const std::string& r_arg : v_Args) {
 			std::string l_value;
@@ -465,19 +474,25 @@ namespace Hades::Driver {
 			if (parseFlag(r_arg, "fbt", l_value))      { l_fbt = l_value;    continue; }
 			if (parseFlag(r_arg, "format", l_value))   { l_format = l_value; continue; }
 			if (parseFlag(r_arg, "timeout", l_value))  { l_timeoutStr = l_value; continue; }
+			if (parseFlag(r_arg, "config", l_value))   { l_config = l_value; continue; }
 			if (r_arg == "--isolate") { l_isolate = true;  continue; }
 			if (r_arg == "--native")  { l_isolate = false; continue; }
 			std::cerr << "warning: unrecognized flag '" << r_arg << "'\n";
+		}
+		if (l_build != "cmake") {
+			std::cerr << "error: --build=" << l_build << " is not yet implemented (only 'cmake' is supported)\n";
+			return 2;
+		}
+		if (!isKnownCMakeConfig(l_config)) {
+			std::cerr << "error: --config=" << l_config << " is not a recognized CMake config "
+			             "(expected Debug, Release, or RelWithDebInfo)\n";
+			return 2;
 		}
 		// 15s default mirrors the manual `timeout 15` wrapper this replaces
 		// (see project_hades_unittest_generation_pipeline.md's isolation runs).
 		unsigned l_timeoutSeconds = 15;
 		if (!l_timeoutStr.empty()) {
 			l_timeoutSeconds = static_cast<unsigned>(std::strtoul(l_timeoutStr.c_str(), nullptr, 10));
-		}
-		if (l_build != "cmake") {
-			std::cerr << "error: --build=" << l_build << " is not yet implemented (only 'cmake' is supported)\n";
-			return 2;
 		}
 
 		std::string l_suiteDir;
@@ -497,12 +512,12 @@ namespace Hades::Driver {
 			std::cerr << "error: cmake configure failed\n";
 			return 1;
 		}
-		if (runCMakeBuild(l_buildDir) != 0) {
+		if (runCMakeBuild(l_buildDir, l_config) != 0) {
 			std::cerr << "error: cmake build failed\n";
 			return 1;
 		}
 
-		const std::string l_exePath = findGeneratedExecutable(l_buildDir, suiteExecutableName(l_suiteDir));
+		const std::string l_exePath = findGeneratedExecutable(l_buildDir, suiteExecutableName(l_suiteDir), l_config);
 		if (l_exePath.empty()) {
 			std::cerr << "error: could not locate the built suite executable under '" << l_buildDir << "'\n";
 			return 1;
@@ -521,15 +536,19 @@ namespace Hades::Driver {
 	}
 
 	int cmdValidate(const std::vector<std::string>& v_Args) {
-		std::string l_build = "cmake";
+		std::string l_build = "cmake", l_config = "Debug";
 		for (const std::string& r_arg : v_Args) {
 			std::string l_value;
-			if (parseFlag(r_arg, "build", l_value)) {
-				l_build = l_value;
-			}
+			if (parseFlag(r_arg, "build", l_value))  { l_build = l_value; }
+			if (parseFlag(r_arg, "config", l_value)) { l_config = l_value; }
 		}
 		if (l_build != "cmake") {
 			std::cerr << "error: --build=" << l_build << " is not yet implemented (only 'cmake' is supported)\n";
+			return 2;
+		}
+		if (!isKnownCMakeConfig(l_config)) {
+			std::cerr << "error: --config=" << l_config << " is not a recognized CMake config "
+			             "(expected Debug, Release, or RelWithDebInfo)\n";
 			return 2;
 		}
 
@@ -551,7 +570,7 @@ namespace Hades::Driver {
 		std::error_code l_ec;
 		fs::remove_all(l_tempBuildDir, l_ec);
 
-		if (runCMakeConfigure(l_genDir, l_tempBuildDir) != 0 || runCMakeBuild(l_tempBuildDir) != 0) {
+		if (runCMakeConfigure(l_genDir, l_tempBuildDir) != 0 || runCMakeBuild(l_tempBuildDir, l_config) != 0) {
 			std::cerr << "validate: build failed, cleaning up\n";
 			fs::remove_all(l_tempBuildDir, l_ec);
 			return 1;

@@ -40,15 +40,18 @@ namespace {
 			"  find-suite <dir>        adopt an existing hades-gen/ suite\n"
 			"  rm <dir>                delete a suite (and un-adopt it if currently adopted)\n"
 			"  new-test <fixture> <id> [--header=] [--adapter=] [--chrono=] [--hash=] [--kind=]\n"
-			"  run [--build=cmake] [--fbt=<pattern>] [--format=console|json]\n"
-			"      [--native|--isolate] [--timeout=<seconds>]\n"
+			"  run [--build=cmake] [--config=Debug|Release|RelWithDebInfo] [--fbt=<pattern>]\n"
+			"      [--format=console|json] [--native|--isolate] [--timeout=<seconds>]\n"
+			"        --config (default Debug): CMake config the generated suite itself is\n"
+			"          built in - independent of which config of hades-driver.exe you're\n"
+			"          running (see driver.bat's own -c).\n"
 			"        --native (default): run the whole suite in one process - fast, but one\n"
 			"          crashing/hanging fixture takes the rest of the run down with it.\n"
 			"        --isolate: spawn one subprocess per matching fixture, killing it after\n"
 			"          --timeout seconds (default 15, 0 = no timeout) if it hangs; prints a\n"
 			"          [i/N] header and lets that fixture's real stdout/stderr stream through\n"
 			"          live, then a PASS/FAIL/TIMEOUT line and a final pass-count summary.\n"
-			"  validate [--build=cmake]\n";
+			"  validate [--build=cmake] [--config=Debug|Release|RelWithDebInfo]\n";
 	}
 
 }
