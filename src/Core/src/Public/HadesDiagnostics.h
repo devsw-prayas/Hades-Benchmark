@@ -21,13 +21,15 @@
 #pragma once
 #include <HadesCompiler.h>
 
-#if defined(_DEBUG) || defined(DEBUG)
+// HADES_DEBUG_CHECKS (0/1) comes from HADES_ENABLE_DEBUG_CHECKS=ON/OFF; unset (AUTO) follows _DEBUG.
+#if defined(HADES_DEBUG_CHECKS)
+#define HADES_BUILD_DEBUG HADES_DEBUG_CHECKS
+#elif defined(_DEBUG)
 #define HADES_BUILD_DEBUG 1
-#define HADES_BUILD_RELEASE 0
 #else
 #define HADES_BUILD_DEBUG 0
-#define HADES_BUILD_RELEASE 1
 #endif
+#define HADES_BUILD_RELEASE (!HADES_BUILD_DEBUG)
 
 #if HADES_BUILD_DEBUG
 #define HADES_ASSERT(expr)                        \
