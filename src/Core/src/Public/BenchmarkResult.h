@@ -24,6 +24,24 @@
 
 namespace Hades::Runtime {
 
+    enum class StopReason : uint8_t {
+        CvConverged,           // CV <= cvThreshold after min_floor
+        HardCapReached,        // slices >= maxSlices
+        ConsecutiveDiscards,   // consecutive jitter-contaminated slices >= cap -> failed
+        TotalDiscards,         // total jitter-contaminated slices >= cap -> failed
+        NotStopped,            // run still in progress
+    };
+
+    HADES_NODISCARD constexpr const char* stopReasonName(StopReason v_Reason) noexcept {
+        switch (v_Reason) {
+            case StopReason::CvConverged:         return "cv-converged";
+            case StopReason::HardCapReached:      return "hard-cap";
+            case StopReason::ConsecutiveDiscards: return "consecutive-discards";
+            case StopReason::TotalDiscards:       return "total-discards";
+            default:                              return "not-stopped";
+        }
+    }
+
     struct HADES_RUNTIME_API BenchmarkResult final{
 
         BenchmarkResult() = default;
@@ -54,6 +72,11 @@ namespace Hades::Runtime {
         uint32_t firstDivergenceSlice;    // index of first diverging slice (0 if none)
         bool     deterministic;           // false if any slice hash diverged from reference
         bool     runFailed;               // true if consecutive/total discard cap was exceeded
+        StopReason stopReason;            // why the slice loop ended
+        uint32_t totalDiscards;           // jitter-discarded slices over the whole run
+        uint32_t maxConsecutiveDiscards;  // longest run of back-to-back discards
+        uint32_t levelShifts;             // times the baseline was moved to a new steady speed
+        double   medianSliceWallTime;     // rolling-window median at the end of the run (seconds)
 
         bool isGpuRun;   // true when fixture was dispatched with a GPU adapter
 
@@ -80,7 +103,7 @@ namespace Hades::Runtime {
         double   readCriticality;
     };
 
-    HADES_STATIC_ASSERT(sizeof(BenchmarkResult) == 280, "BenchmarkResult layout changed - update size comment");
+    HADES_STATIC_ASSERT(sizeof(BenchmarkResult) == 312, "BenchmarkResult layout changed - update size comment");
     HADES_STATIC_ASSERT(std::is_standard_layout_v<BenchmarkResult>, "Benchmark result is not of standard layout");
     HADES_STATIC_ASSERT(std::is_trivially_copy_assignable_v<BenchmarkResult>, "Benchmark must be trivially copyable");
     HADES_STATIC_ASSERT(std::is_trivially_move_assignable_v<BenchmarkResult>, "Benchmark must be trivially move assignable");

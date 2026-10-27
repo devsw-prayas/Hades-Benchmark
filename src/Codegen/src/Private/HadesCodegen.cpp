@@ -246,9 +246,12 @@ namespace Hades::Codegen {
 			}
 			m_first = false;
 			const bool l_passed = !ro_Result.runFailed && ro_Result.deterministic;
-			std::printf("  {\"id\": \"%s\", \"passed\": %s, \"meanThroughput\": %.6f, \"cv\": %.6f, \"sliceCount\": %u}",
+			std::printf("  {\"id\": \"%s\", \"passed\": %s, \"meanThroughput\": %.6f, \"cv\": %.6f, \"sliceCount\": %u, "
+				"\"stopReason\": \"%s\", \"totalDiscards\": %u, \"maxConsecutiveDiscards\": %u, \"levelShifts\": %u, \"medianSliceWallTime\": %.9f}",
 				v_Id.c_str(), l_passed ? "true" : "false",
-				ro_Result.meanThroughput, ro_Result.cv, ro_Result.sliceCount);
+				ro_Result.meanThroughput, ro_Result.cv, ro_Result.sliceCount,
+				stopReasonName(ro_Result.stopReason), ro_Result.totalDiscards,
+				ro_Result.maxConsecutiveDiscards, ro_Result.levelShifts, ro_Result.medianSliceWallTime);
 		}
 
 		void onSuiteComplete() noexcept {}

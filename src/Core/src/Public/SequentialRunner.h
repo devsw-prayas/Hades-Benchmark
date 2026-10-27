@@ -80,7 +80,7 @@ namespace Hades::Runtime {
 			}
 
 			// Calibration slice - not fed into stats, only used to derive stopping knobs.
-			const uint64_t iterationsPerSlice = internalResolveIterationsPerSlice(ro_Config);
+			const uint64_t iterationsPerSlice = internalResolveIterationsPerSlice(ro_Fixture, ro_Adapter, chrono, ro_Config, v_IsGpuRun);
 			const SliceTimings calibration = internalRunSlice(ro_Fixture, ro_Adapter, chrono, iterationsPerSlice, v_IsGpuRun);
 
 			StoppingKnobs configKnobs;
@@ -173,9 +173,30 @@ namespace Hades::Runtime {
 
 		// 0 ("calibration-derived") -> 1 execute()/slice; deriveKnobs absorbs sub-100us noise via more slices, not bigger ones.
 		HADES_NODISCARD_MSG("Cannot discard resolved iteration count")
-			static uint64_t internalResolveIterationsPerSlice(const Config& ro_Config) noexcept {
-			return (ro_Config.m_Iterations > 0) ? ro_Config.m_Iterations : 1;
+			static uint64_t internalResolveIterationsPerSlice(fixture_& ro_Fixture, adapter_& ro_Adapter, chrono_& ro_Chrono, const Config& ro_Config, bool v_IsGpuRun) noexcept {
+			if (ro_Config.m_Iterations > 0)
+				return ro_Config.m_Iterations;
+
+			// Slices of tens of microseconds turn one OS hiccup into a run of discards; sized by time,
+			// a burst of interference costs a single slice. Fastest of a few probes, so a probe that
+			// caught an interrupt doesn't shrink the count.
+			double fastest = 0.0;
+			for (uint32_t i = 0; i < CALIBRATION_PROBES; ++i) {
+				const double probe = internalRunSlice(ro_Fixture, ro_Adapter, ro_Chrono, 1, v_IsGpuRun).cpuWallTime;
+				if (i == 0 || probe < fastest) fastest = probe;
+			}
+			if (fastest <= 0.0)
+				return 1;
+
+			const double iterations = TARGET_SLICE_SECONDS / fastest;
+			if (iterations <= 1.0) return 1;
+			if (iterations >= static_cast<double>(MAX_AUTO_ITERATIONS)) return MAX_AUTO_ITERATIONS;
+			return static_cast<uint64_t>(iterations) + 1;
 		}
+
+		static constexpr double   TARGET_SLICE_SECONDS = 2e-3;
+		static constexpr uint32_t CALIBRATION_PROBES = 3;
+		static constexpr uint64_t MAX_AUTO_ITERATIONS = 1ull << 20;
 
 		HADES_NODISCARD_MSG("Cannot discard slice timings")
 			static SliceTimings internalRunSlice(fixture_& ro_Fixture, adapter_& ro_Adapter, chrono_& ro_Chrono, uint64_t v_Iterations, bool v_IsGpuRun) noexcept {

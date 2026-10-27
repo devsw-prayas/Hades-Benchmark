@@ -43,14 +43,6 @@ namespace Hades::Runtime {
 		uint32_t totalDiscardCap = 0;
 	};
 
-	enum class StopReason : uint8_t {
-		CvConverged,           // CV <= cvThreshold after min_floor
-		HardCapReached,        // slices >= maxSlices
-		ConsecutiveDiscards,   // consecutive jitter-contaminated slices >= cap -> failed
-		TotalDiscards,         // total jitter-contaminated slices >= cap -> failed
-		NotStopped,            // run still in progress
-	};
-
 	struct WelfordState {
 		uint32_t count = 0;
 		double   meanV = 0.0;
@@ -73,6 +65,7 @@ namespace Hades::Runtime {
 	// Compares each slice against the median of the last JITTER_WINDOW accepted slices (no cross-thread median anymore).
 	static constexpr uint32_t JITTER_WINDOW = 8;
 	static constexpr uint32_t JITTER_WINDOW_MIN_SAMPLES = 3;
+	static constexpr uint32_t MAX_LEVEL_SHIFTS = 2;
 
 	class RollingJitterWindow final {
 	public:
@@ -89,6 +82,11 @@ namespace Hades::Runtime {
 
 			const double deviation = (v_SliceWallTime - median) / median;
 			return deviation > v_Threshold;
+		}
+
+		HADES_NODISCARD_MSG("Cannot discard median")
+			double median() const noexcept {
+			return m_count == 0 ? 0.0 : internalMedian();
 		}
 
 		// Only accepted slices feed the baseline.
@@ -136,6 +134,7 @@ namespace Hades::Runtime {
 			, m_acceptedSlices(0)
 			, m_consecutiveDiscards(0)
 			, m_totalDiscards(0)
+			, m_maxConsecutiveDiscards(0)
 			, m_runFailed(false)
 			, m_stopReason(StopReason::NotStopped)
 			, m_jitterThreshold(0.20)   // 20% deviation from rolling median -> jitter
@@ -164,7 +163,8 @@ namespace Hades::Runtime {
 			}
 			m_knobs.cvThreshold = 0.02;
 			m_knobs.consecutiveDiscardCap = 5;
-			m_knobs.totalDiscardCap = 20;
+			// Scales with run length: a fixed 20 fails long DRAM runs on ordinary noise.
+			m_knobs.totalDiscardCap = m_knobs.maxSlices / 10 > 20 ? m_knobs.maxSlices / 10 : 20;
 
 			// Apply user overrides - non-zero values override calibration result
 
@@ -180,7 +180,11 @@ namespace Hades::Runtime {
 		bool feedSlice(const SliceTimings& ro_Timings) noexcept {
 			if (m_jitterWindow.isJittered(ro_Timings.cpuWallTime, m_jitterThreshold)) {
 				++m_totalDiscards;
+				m_discardRun[m_consecutiveDiscards % JITTER_WINDOW] = ro_Timings.cpuWallTime;
 				++m_consecutiveDiscards;
+				if (m_consecutiveDiscards > m_maxConsecutiveDiscards) m_maxConsecutiveDiscards = m_consecutiveDiscards;
+				if (m_consecutiveDiscards >= m_knobs.consecutiveDiscardCap && m_levelShifts < MAX_LEVEL_SHIFTS && internalDiscardRunIsLevel())
+					internalRebaseline();
 				return false;
 			}
 
@@ -256,6 +260,12 @@ namespace Hades::Runtime {
 			ro_Result.sliceCount = m_acceptedSlices;
 			ro_Result.finalSliceWallTime = m_cpuWallTime.meanV;   // last accepted meanV
 
+			ro_Result.stopReason = m_stopReason;
+			ro_Result.totalDiscards = m_totalDiscards;
+			ro_Result.maxConsecutiveDiscards = m_maxConsecutiveDiscards;
+			ro_Result.levelShifts = m_levelShifts;
+			ro_Result.medianSliceWallTime = m_jitterWindow.median();
+
 			ro_Result.isGpuRun = m_isGpuRun;
 
 			if (m_isGpuRun) {
@@ -279,6 +289,35 @@ namespace Hades::Runtime {
 			const StoppingKnobs& knobs() const noexcept { return m_knobs; }
 
 	private:
+		// A run of discards that agree with each other is the machine settling at a new speed
+		// (laptop clocks move ~1.5x), not interference; spikes from interrupts don't line up like this.
+		HADES_NODISCARD_MSG("Cannot discard level decision")
+			bool internalDiscardRunIsLevel() const noexcept {
+			const uint32_t count = m_consecutiveDiscards < JITTER_WINDOW ? m_consecutiveDiscards : JITTER_WINDOW;
+			double lowest = m_discardRun[0], highest = m_discardRun[0];
+			for (uint32_t i = 1; i < count; ++i) {
+				if (m_discardRun[i] < lowest) lowest = m_discardRun[i];
+				if (m_discardRun[i] > highest) highest = m_discardRun[i];
+			}
+			return lowest > 0.0 && (highest - lowest) / lowest <= m_jitterThreshold;
+		}
+
+		// Measures only the new level: mixing two clock speeds into one mean would report neither.
+		void internalRebaseline() noexcept {
+			const uint32_t count = m_consecutiveDiscards < JITTER_WINDOW ? m_consecutiveDiscards : JITTER_WINDOW;
+			m_jitterWindow = RollingJitterWindow{};
+			for (uint32_t i = 0; i < count; ++i)
+				m_jitterWindow.push(m_discardRun[i]);
+
+			m_cpuWallTime = WelfordState{};
+			m_deviceKernelTime = WelfordState{};
+			m_driverOverhead = WelfordState{};
+			m_acceptedSlices = 0;
+			m_totalDiscards -= m_consecutiveDiscards;
+			m_consecutiveDiscards = 0;
+			++m_levelShifts;
+		}
+
 		HADES_NODISCARD_MSG("Cannot discard CV")
 			double internalCurrentCv() const noexcept {
 			return (m_cpuWallTime.meanV > 0.0)
@@ -290,6 +329,9 @@ namespace Hades::Runtime {
 		uint32_t     m_acceptedSlices;
 		uint32_t     m_consecutiveDiscards;
 		uint32_t     m_totalDiscards;
+		uint32_t     m_maxConsecutiveDiscards;
+		uint32_t     m_levelShifts = 0;
+		double       m_discardRun[JITTER_WINDOW] = {};
 		bool         m_runFailed;
 		StopReason   m_stopReason;
 		double       m_jitterThreshold;

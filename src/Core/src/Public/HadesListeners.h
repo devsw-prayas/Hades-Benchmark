@@ -81,6 +81,16 @@ namespace Hades::Runtime {
 				ro_Result.meanThroughput,
 				ro_Result.cv);
 
+			// Correctness runs have no slice loop, so there is nothing to report for them.
+			if (ro_Result.medianSliceWallTime > 0.0 || ro_Result.totalDiscards > 0) {
+				std::printf("    stop=%s, discards=%u (longest run %u), level shifts=%u, median slice=%.1f us\n",
+					stopReasonName(ro_Result.stopReason),
+					ro_Result.totalDiscards,
+					ro_Result.maxConsecutiveDiscards,
+					ro_Result.levelShifts,
+					ro_Result.medianSliceWallTime * 1e6);
+			}
+
 			if (!ro_Result.deterministic) {
 				std::printf("    non-deterministic: %u unique hashes, first divergence at slice %u\n",
 					ro_Result.uniqueHashCount, ro_Result.firstDivergenceSlice);
