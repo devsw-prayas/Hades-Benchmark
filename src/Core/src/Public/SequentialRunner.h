@@ -180,6 +180,10 @@ namespace Hades::Runtime {
 			// Slices of tens of microseconds turn one OS hiccup into a run of discards; sized by time,
 			// a burst of interference costs a single slice. Fastest of a few probes, so a probe that
 			// caught an interrupt doesn't shrink the count.
+			// An untimed pass first: a cold probe (page faults, cold caches) overestimates the
+			// iteration cost and leaves slices far short of the target.
+			(void)internalRunSlice(ro_Fixture, ro_Adapter, ro_Chrono, 1, v_IsGpuRun);
+
 			double fastest = 0.0;
 			for (uint32_t i = 0; i < CALIBRATION_PROBES; ++i) {
 				const double probe = internalRunSlice(ro_Fixture, ro_Adapter, ro_Chrono, 1, v_IsGpuRun).cpuWallTime;
