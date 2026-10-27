@@ -20,6 +20,9 @@
 */
 #include <SuiteDriver.h>
 
+#include <chrono>
+#include <thread>
+
 namespace Hades::Runtime {
 
 	SuiteDriver::SuiteDriver(const FixtureRegistry& ro_Registry, std::vector<SuiteTestEntry> v_Tests) noexcept
@@ -27,8 +30,19 @@ namespace Hades::Runtime {
 		, m_tests(std::move(v_Tests)) {
 	}
 
+	void SuiteDriver::setCooldown(uint16_t v_Seconds) noexcept {
+		m_cooldownSeconds = v_Seconds;
+	}
+
 	void SuiteDriver::run(const std::vector<IHadesListener*>& ro_Listeners) const {
+		bool l_anyRan = false;
 		for (const SuiteTestEntry& r_test : m_tests) {
+			// Correctness runs aren't timing-sensitive; the first test has nothing before it to cool from.
+			if (m_cooldownSeconds > 0 && l_anyRan && r_test.m_Config.m_Kind == TestKind::Performance) {
+				std::this_thread::sleep_for(std::chrono::seconds(m_cooldownSeconds));
+			}
+			l_anyRan = true;
+
 			for (IHadesListener* p_listener : ro_Listeners) {
 				p_listener->onTestStart(r_test.m_Config.m_Id);
 			}

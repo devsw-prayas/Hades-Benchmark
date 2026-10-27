@@ -46,9 +46,14 @@ namespace Hades::Runtime {
 		// An unknown fixture name synthesizes a runFailed result instead of crashing the whole suite.
 		void run(const std::vector<IHadesListener*>& ro_Listeners) const;
 
+		// Seconds to idle before each performance test that follows another test, so heat from the
+		// previous one doesn't throttle it. 0 (default) disables it.
+		void setCooldown(uint16_t v_Seconds) noexcept;
+
 	private:
 		const FixtureRegistry&      m_registry;
 		std::vector<SuiteTestEntry> m_tests;
+		uint16_t                    m_cooldownSeconds = 0;
 	};
 
 }

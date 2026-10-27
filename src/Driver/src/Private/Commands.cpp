@@ -26,10 +26,13 @@
 #include <CodegenInterface.h>
 #include <RegistryIO.h>
 
+#include <charconv>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 #ifndef HADES_BENCHMARK_ROOT
 #define HADES_BENCHMARK_ROOT ""
@@ -128,7 +131,8 @@ namespace Hades::Driver {
 		}
 
 		int cmdRunIsolate(const std::string& v_SuiteDir, const std::string& v_ExePath,
-		                   const std::string& v_Fbt, const std::string& v_Format, unsigned v_TimeoutSeconds) {
+		                   const std::string& v_Fbt, const std::string& v_Format, unsigned v_TimeoutSeconds,
+		                   uint16_t v_CooldownSeconds) {
 			std::vector<Hades::Runtime::SuiteTestEntry> l_tests;
 			std::vector<Hades::Runtime::TomlParseError> l_tomlErrors;
 			if (!Hades::Runtime::readSuiteToml(v_SuiteDir + "/suite.toml", l_tests, l_tomlErrors)) {
@@ -137,9 +141,11 @@ namespace Hades::Driver {
 			}
 
 			std::vector<std::string> l_ids;
+			std::vector<bool> l_isPerformance;
 			for (const Hades::Runtime::SuiteTestEntry& r_test : l_tests) {
 				if (v_Fbt.empty() || wildcardMatch(v_Fbt, r_test.m_Config.m_Id)) {
 					l_ids.push_back(r_test.m_Config.m_Id);
+					l_isPerformance.push_back(r_test.m_Config.m_Kind == Hades::Runtime::TestKind::Performance);
 				}
 			}
 			if (l_ids.empty()) {
@@ -156,6 +162,10 @@ namespace Hades::Driver {
 
 			for (size_t l_i = 0; l_i < l_ids.size(); ++l_i) {
 				const std::string& r_id = l_ids[l_i];
+				// One test per process, so the cooldown has to sit here rather than in SuiteDriver.
+				if (v_CooldownSeconds > 0 && l_i > 0 && l_isPerformance[l_i]) {
+					std::this_thread::sleep_for(std::chrono::seconds(v_CooldownSeconds));
+				}
 				drawProgressBar(l_i, l_ids.size(), l_failedCount, l_clearWidth);
 
 				std::string l_cmd = quotePath(v_ExePath) + " --fbt=" + r_id + " --format=" + v_Format;
@@ -466,11 +476,12 @@ namespace Hades::Driver {
 	}
 
 	int cmdRun(const std::vector<std::string>& v_Args) {
-		std::string l_build = "cmake", l_fbt, l_format = "console", l_timeoutStr, l_config = "Debug";
+		std::string l_build = "cmake", l_fbt, l_format = "console", l_timeoutStr, l_config = "Debug", l_cooldownStr;
 		bool l_isolate = false;
 		for (const std::string& r_arg : v_Args) {
 			std::string l_value;
 			if (parseFlag(r_arg, "build", l_value))    { l_build = l_value;   continue; }
+			if (parseFlag(r_arg, "cooldown", l_value)) { l_cooldownStr = l_value; continue; }
 			if (parseFlag(r_arg, "fbt", l_value))      { l_fbt = l_value;    continue; }
 			if (parseFlag(r_arg, "format", l_value))   { l_format = l_value; continue; }
 			if (parseFlag(r_arg, "timeout", l_value))  { l_timeoutStr = l_value; continue; }
@@ -493,6 +504,18 @@ namespace Hades::Driver {
 		unsigned l_timeoutSeconds = 15;
 		if (!l_timeoutStr.empty()) {
 			l_timeoutSeconds = static_cast<unsigned>(std::strtoul(l_timeoutStr.c_str(), nullptr, 10));
+		}
+
+		// Unset means no cooldown at all; set means it must be a whole number of seconds that fits uint16.
+		uint16_t l_cooldownSeconds = 0;
+		if (!l_cooldownStr.empty()) {
+			unsigned long l_parsed = 0;
+			const auto [p_end, v_error] = std::from_chars(l_cooldownStr.data(), l_cooldownStr.data() + l_cooldownStr.size(), l_parsed);
+			if (v_error != std::errc{} || p_end != l_cooldownStr.data() + l_cooldownStr.size() || l_parsed > 65535) {
+				std::cerr << "error: --cooldown=" << l_cooldownStr << " must be a whole number of seconds from 0 to 65535\n";
+				return 2;
+			}
+			l_cooldownSeconds = static_cast<uint16_t>(l_parsed);
 		}
 
 		std::string l_suiteDir;
@@ -524,7 +547,7 @@ namespace Hades::Driver {
 		}
 
 		if (l_isolate) {
-			return cmdRunIsolate(l_suiteDir, l_exePath, l_fbt, l_format, l_timeoutSeconds);
+			return cmdRunIsolate(l_suiteDir, l_exePath, l_fbt, l_format, l_timeoutSeconds, l_cooldownSeconds);
 		}
 
 		std::string l_cmd = quotePath(l_exePath);
@@ -532,6 +555,9 @@ namespace Hades::Driver {
 			l_cmd += " --fbt=" + l_fbt;
 		}
 		l_cmd += " --format=" + l_format;
+		if (l_cooldownSeconds > 0) {
+			l_cmd += " --cooldown=" + std::to_string(l_cooldownSeconds);
+		}
 		return runProcess(l_cmd);
 	}
 
